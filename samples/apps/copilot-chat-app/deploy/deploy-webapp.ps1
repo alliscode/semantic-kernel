@@ -67,7 +67,7 @@ $swaConfig = $swaConfig.Replace("{{appName}}", "$webappName")
 $swaConfig = $swaConfig.Replace("{{resourceGroup}}", "$ResourceGroupName") 
 $swaConfig = $swaConfig.Replace("{{subscription-id}}", "$Subscription") 
 
-$swaConfig | Out-File -FilePath "$PSScriptRoot/../webapp/swa-cli.config.json"
+$swaConfig | Out-File -FilePath "$PSScriptRoot/../webapp/swa-cli.config.json" -Encoding ascii
 Write-Host $(Get-Content "$PSScriptRoot/../webapp/swa-cli.config.json" -Raw)
 
 Push-Location -Path "$PSScriptRoot/../webapp"
