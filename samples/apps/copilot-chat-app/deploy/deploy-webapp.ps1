@@ -53,12 +53,16 @@ Write-Host "webapiUrl: $webapiUrl"
 # Set UTF8 as default encoding for Out-File
 $PSDefaultParameterValues['Out-File:Encoding'] = 'ascii'
 
-$envFilePath = "$PSScriptRoot/../webapp/.env"
+$envFilePath = Join-Path -Path $PSScriptRoot -ChildPath "/../webapp/.env"
 Write-Host "Writing environment variables to '$envFilePath'..."
 "REACT_APP_BACKEND_URI=https://$webapiUrl/" | Out-File -FilePath $envFilePath
 "REACT_APP_AAD_AUTHORITY=https://login.microsoftonline.com/common" | Out-File -FilePath $envFilePath -Append
 "REACT_APP_AAD_CLIENT_ID=$ApplicationClientId" | Out-File -FilePath $envFilePath -Append
 "REACT_APP_SK_API_KEY=$webapiApiKey" | Out-File -FilePath $envFilePath -Append
+
+$envInfo = $(Get-Content $envFilePath -Raw)
+$envInfo = $envInfo.Replace($webapiApiKey, "$($webapiApiKey.Substring(0, 2))...$($webapiApiKey.Substring($webapiApiKey.Length - 2, 2))")
+Write-Host $envInfo
 
 Write-Host "Generating SWA config..."
 $swaConfig = $(Get-Content "$PSScriptRoot/../webapp/template.swa-cli.config.json" -Raw) 
