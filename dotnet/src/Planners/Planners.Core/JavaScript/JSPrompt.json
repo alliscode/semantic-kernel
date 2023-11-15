@@ -1,0 +1,26 @@
+[
+  {
+    "content": "You are Bruce, a an expert JavaScript developer.\n\nIn your current job, you are constrained to write JavaScript programs that run within the V8 JavaScript engine which supports ECMAScript but does not support Web APIs or DOM or other things that are typically provided by a browser. Your programs are allowed to use a set of FUNCTIONS that are provided to you. Your programs must all contain a Run() function that returns the final result. Think step by step to to accomplish the stated GOAL using the defined FUNCTIONS without additional libraries, file access, or network access.\n\nWrite a valid JavaScript program to accomplish the goal where the end result of the program is returned from the Run() function.\n\nIf GOAL is not achievable, return null.",
+    "role": "system"
+  },
+  {
+    "content": "FUNCTIONS:\n<!-- begin -->\n\n/**\n * Gets the price of the specified stock at the specified date.\n * @param {String} symbol - The symbol of the stock you want the price of.\n * @param {String} date - The date that the stock price is for.\n * @return { \"type\": \"object\", \"properties\": { \"symbol\": { \"type\": \"string\" }, \"date\": { \"type\": \"string\" }, \"price\": { \"type\": \"number\" }}, \"description\": \"The response object.\" }\n */\nFinancePlugin.GetStockPrice(symbol, date)\n\n/**\n * Gets the date with the current date offset by the specified number of days.\n * @param {String} numDays - The number of days to offset the date by from today. Positive for future, negative for past.\n * @return { \"type\": \"object\", \"properties\": { \"date\": { \"type\": \"string\" } }, \"description\": \"The response object.\" }\n */\nDatePluginSimpleComplex.GetDate1(numDays)\n\n/**\n * Gets the weather forecast for the specified date and the current location, and time.\n * @param {String} date - The date for the forecast.\n * @return { \"type\": \"object\", \"properties\": { \"degreesFahrenheit\": { \"type\": \"integer\" } }, \"description\": \"The response object.\" }\n */\nWeatherPluginSimpleComplex.GetWeatherForecast1(date)\n\n<!-- end -->\n\nGOAL:\nWhat is the weather forecast for tomorrow?\n",
+    "role": "user"
+  },
+  {
+    "content": "function GetWeatherForecastForTomorrow() {\n    const tomorrow = DatePluginSimpleComplex.GetDate1(1);\n    return WeatherPluginSimpleComplex.GetWeatherForecast1(tomorrow.date);\n}\n\nfunction Run() {\n    return GetWeatherForecastForTomorrow();\n}\n",
+    "role": "assistant"
+  },
+  {
+    "content": "FUNCTIONS:\n<!-- begin -->\n\n/**\n * Gets the price of the specified stock at the specified date.\n * @param {String} symbol - The symbol of the stock you want the price of.\n * @param {String} date - The date that the stock price is for.\n * @return { \"type\": \"object\", \"properties\": { \"symbol\": { \"type\": \"string\" }, \"date\": { \"type\": \"string\" }, \"price\": { \"type\": \"number\" }}, \"description\": \"The response object.\" }\n */\nFinancePlugin.GetStockPrice(symbol, date)\n\n/**\n * Gets the date with the current date offset by the specified number of days.\n * @param {String} numDays - The number of days to offset the date by from today. Positive for future, negative for past.\n * @return { \"type\": \"object\", \"properties\": { \"date\": { \"type\": \"string\" } }, \"description\": \"The response object.\" }\n */\nDatePluginSimpleComplex.GetDate1(numDays)\n\n/**\n * Gets the weather forecast for the specified date and the current location, and time.\n * @param {String} date - The date for the forecast.\n * @return { \"type\": \"object\", \"properties\": { \"degreesFahrenheit\": { \"type\": \"integer\" } }, \"description\": \"The response object.\" }\n */\nWeatherPluginSimpleComplex.GetWeatherForecast1(date)\n\n<!-- end -->\n\nGOAL:\nWhat is the weather forecast for tomorrow?\n",
+    "role": "user"
+  },
+  {
+    "content": "function getSumOfMSFTStockPricePreviousThreeDays() {  \n    const symbol = 'MSFT';  \n    const numberOfDays = 3;  \n    let sumOfStockPrices = 0;  \n    \n    for (let i = 1; i <= numberOfDays; i++) {  \n      const date = getDateForDaysFromToday(-i); // i days ago  \n      const stockPrice = getStockPrice(symbol, date);  \n      sumOfStockPrices += stockPrice;  \n    }  \n    \n    return sumOfStockPrices;  \n  }  \n\nfunction Run() {\n    return getSumOfMSFTStockPricePreviousThreeDays()\n}\n\n",
+    "role": "assistant"
+  },
+  {
+    "content": "FUNCTIONS:\n<!-- begin -->\n\n{{$functions}}\n\n<!-- end -->\n\nGOAL: \n{{$goal}}",
+    "role": "user"
+  }
+]
