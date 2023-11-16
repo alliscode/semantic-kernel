@@ -13,6 +13,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Json.Schema;
 using Json.Schema.Generation;
+using Microsoft.ClearScript.V8;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel.AI.ChatCompletion;
 using Microsoft.SemanticKernel.Diagnostics;
@@ -33,6 +34,7 @@ public sealed class JavascriptPlanner
     private readonly JavascriptPlannerConfig _config;
     private readonly BasicPromptTemplateFactory _promptTemplateFactory;
     private readonly string _initialPlanPromptManifest;
+    private readonly Dictionary<string, object> _pluginDict = new Dictionary<string, object>();
 
     private const string RestrictedPluginName = "JavaScriptPlanner_Excluded";
 
@@ -57,7 +59,7 @@ public sealed class JavascriptPlanner
         this._config = config ?? new();
         this._config.ExcludedPlugins.Add(RestrictedPluginName);
 
-        this._initialPlanPromptManifest = EmbeddedResource.Read("JSPrompt.json");
+        this._initialPlanPromptManifest = EmbeddedResource.Read("JavaScript.JSPrompt.json");
 
         // Create context and logger
         this._logger = this._kernel.LoggerFactory.CreateLogger(this.GetType());
@@ -69,7 +71,7 @@ public sealed class JavascriptPlanner
     /// <param name="goal">The goal to be reached by the planner.</param>
     /// <param name="cancellationToken">A cancellation token.</param>
     /// <returns>A <see cref="Task"/></returns>
-    public async Task ExecuteAsync(string goal, CancellationToken cancellationToken = default)
+    public async Task<string> ExecuteAsync(string goal, CancellationToken cancellationToken = default)
     {
         var functionsManual = this.GenerateFunctionDescriptions(this._kernel, cancellationToken);
         var context =
@@ -81,6 +83,21 @@ public sealed class JavascriptPlanner
                     });
 
         ChatHistory chatHistory = await this.ReadPromptManifestAsync(this._initialPlanPromptManifest, context, cancellationToken).ConfigureAwait(false);
+        IChatCompletion chatCompletion = this._kernel.GetService<IChatCompletion>();
+        string planResultString = await chatCompletion.GenerateMessageAsync(chatHistory, cancellationToken: cancellationToken).ConfigureAwait(false);
+
+        using var engine = new V8ScriptEngine();
+        foreach (var kvp in this._pluginDict)
+        {
+            dynamic expando = kvp.Value;
+            engine.AddHostObject(kvp.Key, expando);
+        }
+
+        engine.Execute(planResultString);
+        var output = engine.Script.Run();
+
+        var result = JsonSerializer.Serialize(output);
+        return result;
     }
 
     private string GenerateFunctionDescriptions(IKernel kernel, CancellationToken cancellationToken)
@@ -88,62 +105,74 @@ public sealed class JavascriptPlanner
         var jsonSchemaBuilder = new JsonSchemaBuilder();
         var jsFunctionSigatures = new List<string>();
 
-        foreach (FunctionView skFunction in this._kernel.Functions.GetFunctionViews())
-        {
-            dynamic plugin = new ExpandoObject();
-            var jsDocBuilder = new StringBuilder();
-            var tsSignatureBuilder = new StringBuilder();
-
-            string functionName = $"{skFunction.PluginName}_{skFunction.Name}";
-            tsSignatureBuilder.Append($"{functionName}(");
-            jsDocBuilder.AppendLine($"/**\n * {skFunction.Description}");
-
-            int paramNum = 0;
-            var requiredProperties = new List<string>();
-            foreach (var parameterView in skFunction.Parameters)
+        var functionsByPlugin = this._kernel.Functions.GetFunctionViews()
+            .GroupBy(x => x.PluginName, x => x, (key, group) => new
             {
-                string typeName = parameterView switch
+                Name = key,
+                Functions = group.ToList()
+            });
+
+        foreach (var plugin in functionsByPlugin)
+        {
+            dynamic pluginProxy = new ExpandoObject();
+            foreach (FunctionView skFunction in plugin.Functions)
+            {
+                var jsDocBuilder = new StringBuilder();
+                var tsSignatureBuilder = new StringBuilder();
+
+                string functionName = $"{skFunction.PluginName}_{skFunction.Name}";
+                tsSignatureBuilder.Append($"{functionName}(");
+                jsDocBuilder.AppendLine($"/**\n * {skFunction.Description}");
+
+                int paramNum = 0;
+                var requiredProperties = new List<string>();
+                foreach (var parameterView in skFunction.Parameters)
                 {
-                    var p when p.Schema != null => JsonSchema.FromText(p.Schema.RootElement.GetRawText()).GetJsonType()?.ToString() ?? "null",
+                    string typeName = parameterView switch
+                    {
+                        var p when p.Schema != null => JsonSchema.FromText(p.Schema.RootElement.GetRawText()).GetJsonType()?.ToString() ?? "null",
+                        var p when p.ParameterType != null => p.ParameterType.Name!,
+                        _ => throw new InvalidOperationException($"Could not determind the schema for parameter with name: {parameterView.Name}.")
+                    };
+
+                    JsonSchema parameterSchema = parameterView switch
+                    {
+                        var p when p.Schema != null => JsonSchema.FromText(p.Schema.RootElement.GetRawText()),
+                        var p when p.ParameterType != null => jsonSchemaBuilder.FromType(p.ParameterType).Description(p.Description ?? "").Build(),
+                        _ => throw new InvalidOperationException($"Could not determind the schema for parameter with name: {parameterView.Name}.")
+                    };
+
+                    string parameterName = parameterView.Name;
+                    tsSignatureBuilder.Append($"{(paramNum > 0 ? ", " : "")}{parameterName}");
+                    jsDocBuilder.AppendLine($" * @param {{{typeName}}} {parameterName} - {parameterView.Description}");
+                    paramNum++;
+                }
+
+                string returnTypeName = skFunction.ReturnParameter switch
+                {
+                    var p when p.Schema != null => JsonSchema.FromText(p.Schema.RootElement.GetRawText()).GetJsonType()?.ToString() ?? "Null",
                     var p when p.ParameterType != null => p.ParameterType.Name!,
-                    _ => throw new InvalidOperationException($"Could not determind the schema for parameter with name: {parameterView.Name}.")
+                    _ => throw new InvalidOperationException($"Could not determind the type name for return parameter.")
                 };
 
-                JsonSchema parameterSchema = parameterView switch
+                JsonSchema returnParameterSchema = skFunction.ReturnParameter switch
                 {
                     var p when p.Schema != null => JsonSchema.FromText(p.Schema.RootElement.GetRawText()),
                     var p when p.ParameterType != null => jsonSchemaBuilder.FromType(p.ParameterType).Description(p.Description ?? "").Build(),
-                    _ => throw new InvalidOperationException($"Could not determind the schema for parameter with name: {parameterView.Name}.")
+                    _ => throw new InvalidOperationException($"Could not determind the schema for return parameter.")
                 };
 
-                string parameterName = parameterView.Name;
-                tsSignatureBuilder.Append($"{(paramNum > 0 ? ", " : "")}{parameterName}");
-                jsDocBuilder.AppendLine($" * @param {{{typeName}}} {parameterName} - {parameterView.Description}");
-                paramNum++;
+                tsSignatureBuilder.Append(')');
+                jsDocBuilder.AppendLine($" * @return {JsonSerializer.Serialize(returnParameterSchema)}");
+                jsDocBuilder.AppendLine(" */");
+                jsFunctionSigatures.Add($"{jsDocBuilder}{tsSignatureBuilder}");
+
+                var pluginBuilder = pluginProxy as IDictionary<string, object>;
+                var skFunctionProxy = this.BuildFunctionProxy(kernel, skFunction.PluginName, skFunction.Parameters, skFunction.Name, skFunction.ReturnParameter);
+                pluginBuilder!.Add(functionName, skFunctionProxy);
             }
 
-            string returnTypeName = skFunction.ReturnParameter switch
-            {
-                var p when p.Schema != null => JsonSchema.FromText(p.Schema.RootElement.GetRawText()).GetJsonType()?.ToString() ?? "Null",
-                var p when p.ParameterType != null => p.ParameterType.Name!,
-                _ => throw new InvalidOperationException($"Could not determind the type name for return parameter.")
-            };
-
-            JsonSchema returnParameterSchema = skFunction.ReturnParameter switch
-            {
-                var p when p.Schema != null => JsonSchema.FromText(p.Schema.RootElement.GetRawText()),
-                var p when p.ParameterType != null => jsonSchemaBuilder.FromType(p.ParameterType).Description(p.Description ?? "").Build(),
-                _ => throw new InvalidOperationException($"Could not determind the schema for return parameter.")
-            };
-
-            tsSignatureBuilder.Append(')');
-            jsDocBuilder.AppendLine($" * @return {JsonSerializer.Serialize(returnParameterSchema)}");
-            jsDocBuilder.AppendLine(" */");
-            jsFunctionSigatures.Add($"{jsDocBuilder}{tsSignatureBuilder}");
-
-            var pluginBuilder = plugin as IDictionary<string, object>;
-            var skFunctionProxy = this.BuildFunctionProxy(kernel, skFunction.PluginName, skFunction.Parameters, skFunction.Name, skFunction.ReturnParameter);
-            pluginBuilder!.Add(functionName, skFunctionProxy);
+            this._pluginDict.Add(plugin.Name, pluginProxy);
         }
 
         string jsSignatures = string.Join("\n\n", jsFunctionSigatures);
@@ -301,4 +330,16 @@ public sealed class JavascriptPlanner
     }
 
     private record ChatPromptMessage(string Role, string Content);
+
+    private class PluginContainer
+    {
+        public PluginContainer(string name)
+        {
+            this.Name = name;
+        }
+
+        public string Name { get; set; } = "";
+
+        public IList<FunctionView>? Functions { get; set; } = new List<FunctionView>();
+    }
 }

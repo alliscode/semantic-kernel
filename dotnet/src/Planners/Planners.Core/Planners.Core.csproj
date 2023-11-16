@@ -32,7 +32,9 @@
     <EmbeddedResource Include="Action\skprompt.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </EmbeddedResource>
-    <EmbeddedResource Include="JavaScript\JSPrompt.json" />
+    <EmbeddedResource Include="JavaScript\JSPrompt.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </EmbeddedResource>
     <EmbeddedResource Include="Sequential\skprompt.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </EmbeddedResource>
@@ -76,6 +78,7 @@
   <ItemGroup>
     <PackageReference Include="Handlebars.Net" />
     <PackageReference Include="JsonSchema.Net.Generation" />
+    <PackageReference Include="Microsoft.ClearScript.Complete" />
   </ItemGroup>
 
 </Project>
