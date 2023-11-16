@@ -3,11 +3,9 @@
 using System;
 using System.Collections.Generic;
 using System.Dynamic;
-using System.IO;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
-using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
@@ -65,21 +63,27 @@ public sealed class JavascriptPlanner
         this._logger = this._kernel.LoggerFactory.CreateLogger(this.GetType());
     }
 
+    /// <summary>
+    /// Runs the planner.
+    /// </summary>
+    /// <param name="goal">The goal to be reached by the planner.</param>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    /// <returns>A <see cref="Task"/></returns>
     public async Task ExecuteAsync(string goal, CancellationToken cancellationToken = default)
     {
-        var functionsManual = await this.GenerateFunctionDescriptions(this._kernel, cancellationToken).ConfigureAwait(false);
+        var functionsManual = this.GenerateFunctionDescriptions(this._kernel, cancellationToken);
         var context =
                 this._kernel.CreateNewContext(
                     new()
                     {
-                    { "goal", goal },
-                    { "functions", functionsManual },
+                        { "goal", goal },
+                        { "functions", functionsManual },
                     });
 
         ChatHistory chatHistory = await this.ReadPromptManifestAsync(this._initialPlanPromptManifest, context, cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task<string> GenerateFunctionDescriptions(IKernel kernel, CancellationToken cancellationToken)
+    private string GenerateFunctionDescriptions(IKernel kernel, CancellationToken cancellationToken)
     {
         var jsonSchemaBuilder = new JsonSchemaBuilder();
         var jsFunctionSigatures = new List<string>();
@@ -113,8 +117,6 @@ public sealed class JavascriptPlanner
                 };
 
                 string parameterName = parameterView.Name;
-
-
                 tsSignatureBuilder.Append($"{(paramNum > 0 ? ", " : "")}{parameterName}");
                 jsDocBuilder.AppendLine($" * @param {{{typeName}}} {parameterName} - {parameterView.Description}");
                 paramNum++;
@@ -140,32 +142,30 @@ public sealed class JavascriptPlanner
             jsFunctionSigatures.Add($"{jsDocBuilder}{tsSignatureBuilder}");
 
             var pluginBuilder = plugin as IDictionary<string, object>;
-            var skFunctionProxy = BuildFunctionProxy(kernel, skFunction.PluginName, skFunction);
+            var skFunctionProxy = this.BuildFunctionProxy(kernel, skFunction.PluginName, skFunction.Parameters, skFunction.Name, skFunction.ReturnParameter);
             pluginBuilder!.Add(functionName, skFunctionProxy);
         }
 
         string jsSignatures = string.Join("\n\n", jsFunctionSigatures);
-        //return JsonSerializer.Serialize(allFunctions);
         return jsSignatures;
     }
 
-    private Delegate BuildFunctionProxy(IKernel kernel, string pluginName, MethodInfo method)
+    private Delegate BuildFunctionProxy(IKernel kernel, string pluginName, IReadOnlyList<ParameterView> parameterViews, string functionName, ReturnParameterView returnParameter)
     {
         try
         {
-            var methodParmas = method.GetParameters();
-            var expressionParams = methodParmas.Select(p => Expression.Parameter(p.ParameterType, p.Name)).ToList();
+            // TODO: Support types for remote plugins
+            var expressionParams = parameterViews.Select(p => Expression.Parameter(p.ParameterType, p.Name)).ToList();
 
-            var varsDict = Expression.Variable(typeof(Dictionary<string, ParamView>));
-            var paramView = Expression.Variable(typeof(ParamView));
+            var varsDictExp = Expression.Variable(typeof(Dictionary<string, ParamView>));
+            var paramViewExp = Expression.Variable(typeof(ParamView));
             var kernelExp = Expression.Constant(kernel);
-            var loggerExp = Expression.Constant(_logger);
+            var loggerExp = Expression.Constant(this._logger);
             var pluginNameExp = Expression.Constant(pluginName);
-            var functionName = Expression.Constant(method.Name);
-            var returnType = Expression.Constant(method.ReturnType);
+            var functionNameExp = Expression.Constant(functionName);
+            var returnTypeExp = Expression.Constant(returnParameter.ParameterType);
 
-
-            var invokeFunction = typeof(JavascriptPlanner).GetMethod("InvokeSkFunction", BindingFlags.Public | BindingFlags.Static)!;
+            var invokeFunction = typeof(JavascriptPlanner).GetMethod("InvokeSkFunction", BindingFlags.NonPublic | BindingFlags.Static)!;
             var varsDictAdd = typeof(Dictionary<string, ParamView>).GetMethod(
                 name: "Add",
                 bindingAttr: BindingFlags.Instance | BindingFlags.Public,
@@ -173,32 +173,32 @@ public sealed class JavascriptPlanner
                 types: new[] { typeof(string), typeof(ParamView) },
                 modifiers: null)!;
 
-            var body = new List<Expression>();
-
             // create a new dictionary and assign it to varsDict
-            body.Add(Expression.Assign(varsDict, Expression.New(typeof(Dictionary<string, ParamView>))));
+            var body = new List<Expression>
+            {
+                Expression.Assign(varsDictExp, Expression.New(typeof(Dictionary<string, ParamView>)))
+            };
 
-            for (int i = 0; i < methodParmas.Length; i++)
+            for (int i = 0; i < parameterViews.Count; i++)
             {
                 // Create a new ParamView and assign it to paramView
                 var paramAsObject = Expression.Convert(expressionParams[i], typeof(object));
                 body.Add(
                     Expression.Assign(
-                        left: paramView,
+                        left: paramViewExp,
                         right: Expression.New(
                             constructor: typeof(ParamView).GetConstructor(new[] { typeof(object), typeof(Type) })!,
-                            arguments: new Expression[] { paramAsObject, Expression.Constant(methodParmas[i].ParameterType) })));
+                            arguments: new Expression[] { paramAsObject, Expression.Constant(parameterViews[i].ParameterType) })));
 
                 // Add the paramView to the varsDict
-                body.Add(Expression.Call(varsDict, varsDictAdd, Expression.Constant(methodParmas[i].Name), paramView));
+                body.Add(Expression.Call(varsDictExp, varsDictAdd, Expression.Constant(parameterViews[i].Name), paramViewExp));
             }
 
             // Invoke the SKFunction
-
-            var invokeResult = Expression.Call(invokeFunction, new Expression[] { kernelExp, loggerExp, pluginNameExp, functionName, returnType, varsDict });
+            var invokeResult = Expression.Call(invokeFunction, new Expression[] { kernelExp, loggerExp, pluginNameExp, functionNameExp, returnTypeExp, varsDictExp });
             body.Add(invokeResult);
 
-            var block = Expression.Block(new[] { varsDict, paramView }, body);
+            var block = Expression.Block(new[] { varsDictExp, paramViewExp }, body);
 
             var lambda = Expression.Lambda(block, false, expressionParams);
             var proxy = lambda.Compile();
@@ -206,23 +206,11 @@ public sealed class JavascriptPlanner
         }
         catch (Exception ex)
         {
-
             throw;
         }
     }
 
-    private static string SerializeObject(object? obj, Type? targetType)
-    {
-        // Strings just parse to themselves.
-        if (obj is string)
-        {
-            return (string)obj;
-        }
-
-        return JsonSerializer.Serialize(obj);
-    }
-
-    public static object InvokeSkFunction(IKernel kernel, ILogger logger, string pluginName, string functionName, Type returnType, Dictionary<string, ParamView> variables)
+    private static object InvokeSkFunction(IKernel kernel, ILogger logger, string pluginName, string functionName, Type returnType, Dictionary<string, ParamView> variables)
     {
         try
         {
@@ -255,12 +243,22 @@ public sealed class JavascriptPlanner
         }
         catch (Exception ex)
         {
-
             throw;
         }
     }
 
-    public class ParamView
+    private static string SerializeObject(object? obj, Type? targetType)
+    {
+        // Strings just parse to themselves.
+        if (obj is string)
+        {
+            return (string)obj;
+        }
+
+        return JsonSerializer.Serialize(obj);
+    }
+
+    private class ParamView
     {
         public ParamView(object value, Type type)
         {
