@@ -102,7 +102,6 @@ public sealed class JavascriptPlanner
 
     private string GenerateFunctionDescriptions(IKernel kernel, CancellationToken cancellationToken)
     {
-        var jsonSchemaBuilder = new JsonSchemaBuilder();
         var jsFunctionSigatures = new List<string>();
 
         var functionsByPlugin = this._kernel.Functions.GetFunctionViews()
@@ -120,9 +119,14 @@ public sealed class JavascriptPlanner
                 var jsDocBuilder = new StringBuilder();
                 var tsSignatureBuilder = new StringBuilder();
 
-                string functionName = $"{skFunction.PluginName}_{skFunction.Name}";
-                tsSignatureBuilder.Append($"{functionName}(");
+                string functionName = skFunction.Name;
+                tsSignatureBuilder.Append($"{skFunction.PluginName}.{skFunction.Name}(");
                 jsDocBuilder.AppendLine($"/**\n * {skFunction.Description}");
+
+                if (functionName == "Time")
+                {
+                    int x = 3;
+                }
 
                 int paramNum = 0;
                 var requiredProperties = new List<string>();
@@ -138,7 +142,7 @@ public sealed class JavascriptPlanner
                     JsonSchema parameterSchema = parameterView switch
                     {
                         var p when p.Schema != null => JsonSchema.FromText(p.Schema.RootElement.GetRawText()),
-                        var p when p.ParameterType != null => jsonSchemaBuilder.FromType(p.ParameterType).Description(p.Description ?? "").Build(),
+                        var p when p.ParameterType != null => new JsonSchemaBuilder().FromType(p.ParameterType).Description(p.Description ?? "").Build(),
                         _ => throw new InvalidOperationException($"Could not determind the schema for parameter with name: {parameterView.Name}.")
                     };
 
@@ -148,19 +152,24 @@ public sealed class JavascriptPlanner
                     paramNum++;
                 }
 
-                string returnTypeName = skFunction.ReturnParameter switch
+                string returnTypeName = "";
+                JsonSchema? returnParameterSchema = null;
+                if (skFunction.ReturnParameter.Schema is null)
                 {
-                    var p when p.Schema != null => JsonSchema.FromText(p.Schema.RootElement.GetRawText()).GetJsonType()?.ToString() ?? "Null",
-                    var p when p.ParameterType != null => p.ParameterType.Name!,
-                    _ => throw new InvalidOperationException($"Could not determind the type name for return parameter.")
-                };
+                    var returnType = skFunction.ReturnParameter.ParameterType;
+                    if (returnType.BaseType == typeof(Task) && returnType.GenericTypeArguments.Any())
+                    {
+                        returnType = skFunction.ReturnParameter.ParameterType.GenericTypeArguments[0];
+                    }
 
-                JsonSchema returnParameterSchema = skFunction.ReturnParameter switch
+                    returnTypeName = returnType.Name;
+                    returnParameterSchema = new JsonSchemaBuilder().FromType(returnType).Description(skFunction.ReturnParameter.Description ?? "").Build();
+                }
+                else
                 {
-                    var p when p.Schema != null => JsonSchema.FromText(p.Schema.RootElement.GetRawText()),
-                    var p when p.ParameterType != null => jsonSchemaBuilder.FromType(p.ParameterType).Description(p.Description ?? "").Build(),
-                    _ => throw new InvalidOperationException($"Could not determind the schema for return parameter.")
-                };
+                    returnTypeName = JsonSchema.FromText(skFunction.ReturnParameter.Schema.RootElement.GetRawText()).GetJsonType()?.ToString() ?? "Null";
+                    returnParameterSchema = JsonSchema.FromText(skFunction.ReturnParameter.Schema.RootElement.GetRawText());
+                }
 
                 tsSignatureBuilder.Append(')');
                 jsDocBuilder.AppendLine($" * @return {JsonSerializer.Serialize(returnParameterSchema)}");
