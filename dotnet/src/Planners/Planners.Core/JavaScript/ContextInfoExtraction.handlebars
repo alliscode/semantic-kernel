@@ -1,0 +1,17 @@
+{{#each statements}}
+<message role="user">{{this}}</message>
+{{/each}}
+
+<message role="user">Using the context provided above, provide answers or values for the following questions.</message>
+
+<message role="user">{{questions}}</message>
+
+<message role="system">
+    Important! Only provide an RFC8259 complian JSON response following this format without deviation:
+
+    [
+        "Answer to question 1",
+        "Answer to question 2",
+        "Answer to question 3"
+    ]
+</message>

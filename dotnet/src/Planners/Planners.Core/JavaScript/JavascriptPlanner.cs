@@ -2,7 +2,9 @@
 
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Dynamic;
+using System.Globalization;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -13,6 +15,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Json.Schema;
 using Json.Schema.Generation;
+using Microsoft.ClearScript;
 using Microsoft.ClearScript.V8;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel.AI.ChatCompletion;
@@ -37,6 +40,8 @@ public sealed class JavascriptPlanner
     private readonly Dictionary<string, object> _pluginDict = new Dictionary<string, object>();
 
     private const string RestrictedPluginName = "JavaScriptPlanner_Excluded";
+
+
 
 
     /// <summary>
@@ -73,31 +78,42 @@ public sealed class JavascriptPlanner
     /// <returns>A <see cref="Task"/></returns>
     public async Task<string> ExecuteAsync(string goal, CancellationToken cancellationToken = default)
     {
-        var functionsManual = this.GenerateFunctionDescriptions(this._kernel, cancellationToken);
-        var context =
-                this._kernel.CreateNewContext(
-                    new()
-                    {
+        try
+        {
+            var llmToolsPlugin = new TextTools(this._kernel);
+            this._kernel.ImportFunctions(llmToolsPlugin, "textTools");
+
+            var functionsManual = this.GenerateFunctionDescriptions(this._kernel, cancellationToken);
+            var context =
+                    this._kernel.CreateNewContext(
+                        new()
+                        {
                         { "goal", goal },
                         { "functions", functionsManual },
-                    });
+                        });
 
-        ChatHistory chatHistory = await this.ReadPromptManifestAsync(this._initialPlanPromptManifest, context, cancellationToken).ConfigureAwait(false);
-        IChatCompletion chatCompletion = this._kernel.GetService<IChatCompletion>();
-        string planResultString = await chatCompletion.GenerateMessageAsync(chatHistory, cancellationToken: cancellationToken).ConfigureAwait(false);
+            ChatHistory chatHistory = await this.ReadPromptManifestAsync(this._initialPlanPromptManifest, context, cancellationToken).ConfigureAwait(false);
+            IChatCompletion chatCompletion = this._kernel.GetService<IChatCompletion>();
+            string planResultString = await chatCompletion.GenerateMessageAsync(chatHistory, cancellationToken: cancellationToken).ConfigureAwait(false);
 
-        using var engine = new V8ScriptEngine();
-        foreach (var kvp in this._pluginDict)
-        {
-            dynamic expando = kvp.Value;
-            engine.AddHostObject(kvp.Key, expando);
+            using var engine = new V8ScriptEngine();
+            foreach (var kvp in this._pluginDict)
+            {
+                dynamic expando = kvp.Value;
+                engine.AddHostObject(kvp.Key, expando);
+            }
+
+            engine.Execute(planResultString);
+            var output = engine.Script.Run();
+
+            var result = JsonSerializer.Serialize(output);
+            return result;
         }
+        catch (Exception ex)
+        {
 
-        engine.Execute(planResultString);
-        var output = engine.Script.Run();
-
-        var result = JsonSerializer.Serialize(output);
-        return result;
+            throw;
+        }
     }
 
     private string GenerateFunctionDescriptions(IKernel kernel, CancellationToken cancellationToken)
@@ -111,6 +127,7 @@ public sealed class JavascriptPlanner
                 Functions = group.ToList()
             });
 
+        var typeDefBuilder = new StringBuilder();
         foreach (var plugin in functionsByPlugin)
         {
             dynamic pluginProxy = new ExpandoObject();
@@ -132,19 +149,27 @@ public sealed class JavascriptPlanner
                 var requiredProperties = new List<string>();
                 foreach (var parameterView in skFunction.Parameters)
                 {
-                    string typeName = parameterView switch
-                    {
-                        var p when p.Schema != null => JsonSchema.FromText(p.Schema.RootElement.GetRawText()).GetJsonType()?.ToString() ?? "null",
-                        var p when p.ParameterType != null => p.ParameterType.Name!,
-                        _ => throw new InvalidOperationException($"Could not determind the schema for parameter with name: {parameterView.Name}.")
-                    };
+                    string typeName = "";
+                    JsonSchema? parameterSchema = null;
+                    bool isPrimative;
 
-                    JsonSchema parameterSchema = parameterView switch
+                    if (parameterView.Schema is null)
                     {
-                        var p when p.Schema != null => JsonSchema.FromText(p.Schema.RootElement.GetRawText()),
-                        var p when p.ParameterType != null => new JsonSchemaBuilder().FromType(p.ParameterType).Description(p.Description ?? "").Build(),
-                        _ => throw new InvalidOperationException($"Could not determind the schema for parameter with name: {parameterView.Name}.")
-                    };
+                        typeName = parameterView.ParameterType!.Name;
+                        parameterSchema = new JsonSchemaBuilder().FromType(parameterView.ParameterType).Description(parameterView.Description ?? "").Build();
+                        isPrimative = parameterView.ParameterType!.IsPrimitive || parameterView.ParameterType == typeof(string);
+                    }
+                    else
+                    {
+                        typeName = JsonSchema.FromText(parameterView.Schema.RootElement.GetRawText()).GetJsonType()?.ToString() ?? "null";
+                        parameterSchema = JsonSchema.FromText(parameterView.Schema.RootElement.GetRawText());
+                        isPrimative = parameterSchema.GetJsonType() != SchemaValueType.Object;
+                    }
+
+                    if (!isPrimative)
+                    {
+                        typeDefBuilder.AppendLine($"{{{typeName}}}: {JsonSerializer.Serialize(parameterSchema)}");
+                    }
 
                     string parameterName = parameterView.Name;
                     tsSignatureBuilder.Append($"{(paramNum > 0 ? ", " : "")}{parameterName}");
@@ -152,6 +177,7 @@ public sealed class JavascriptPlanner
                     paramNum++;
                 }
 
+                bool returnIsPrimative;
                 string returnTypeName = "";
                 JsonSchema? returnParameterSchema = null;
                 if (skFunction.ReturnParameter.Schema is null)
@@ -164,15 +190,18 @@ public sealed class JavascriptPlanner
 
                     returnTypeName = returnType.Name;
                     returnParameterSchema = new JsonSchemaBuilder().FromType(returnType).Description(skFunction.ReturnParameter.Description ?? "").Build();
+                    returnIsPrimative = returnType!.IsPrimitive;
                 }
                 else
                 {
                     returnTypeName = JsonSchema.FromText(skFunction.ReturnParameter.Schema.RootElement.GetRawText()).GetJsonType()?.ToString() ?? "Null";
                     returnParameterSchema = JsonSchema.FromText(skFunction.ReturnParameter.Schema.RootElement.GetRawText());
+                    returnIsPrimative = returnParameterSchema.GetJsonType() != SchemaValueType.Object;
                 }
 
                 tsSignatureBuilder.Append(')');
-                jsDocBuilder.AppendLine($" * @return {JsonSerializer.Serialize(returnParameterSchema)}");
+                string returnObjectDescription = $"{returnTypeName} - {skFunction.ReturnParameter.Description}";
+                jsDocBuilder.AppendLine($" * @return {(returnIsPrimative ? JsonSerializer.Serialize(returnParameterSchema) : returnObjectDescription)}");
                 jsDocBuilder.AppendLine(" */");
                 jsFunctionSigatures.Add($"{jsDocBuilder}{tsSignatureBuilder}");
 
@@ -184,7 +213,7 @@ public sealed class JavascriptPlanner
             this._pluginDict.Add(plugin.Name, pluginProxy);
         }
 
-        string jsSignatures = string.Join("\n\n", jsFunctionSigatures);
+        string jsSignatures = $"{typeDefBuilder}\n{string.Join("\n\n", jsFunctionSigatures)}";
         return jsSignatures;
     }
 
@@ -194,6 +223,7 @@ public sealed class JavascriptPlanner
         {
             // TODO: Support types for remote plugins
             var expressionParams = parameterViews.Select(p => Expression.Parameter(p.ParameterType, p.Name)).ToList();
+            var expressionObjParams = parameterViews.Select(p => Expression.Parameter(typeof(object), p.Name)).ToList();
 
             var varsDictExp = Expression.Variable(typeof(Dictionary<string, ParamView>));
             var paramViewExp = Expression.Variable(typeof(ParamView));
@@ -220,7 +250,7 @@ public sealed class JavascriptPlanner
             for (int i = 0; i < parameterViews.Count; i++)
             {
                 // Create a new ParamView and assign it to paramView
-                var paramAsObject = Expression.Convert(expressionParams[i], typeof(object));
+                var paramAsObject = Expression.Convert(expressionObjParams[i]/*expressionParams[i]*/, typeof(object));
                 body.Add(
                     Expression.Assign(
                         left: paramViewExp,
@@ -232,13 +262,18 @@ public sealed class JavascriptPlanner
                 body.Add(Expression.Call(varsDictExp, varsDictAdd, Expression.Constant(parameterViews[i].Name), paramViewExp));
             }
 
+            if (pluginName == "llmTools")
+            {
+                int x = 3;
+            }
+
             // Invoke the SKFunction
             var invokeResult = Expression.Call(invokeFunction, new Expression[] { kernelExp, loggerExp, pluginNameExp, functionNameExp, returnTypeExp, varsDictExp });
             body.Add(invokeResult);
 
             var block = Expression.Block(new[] { varsDictExp, paramViewExp }, body);
 
-            var lambda = Expression.Lambda(block, false, expressionParams);
+            var lambda = Expression.Lambda(block, false, expressionObjParams /*expressionParams*/);
             var proxy = lambda.Compile();
             return proxy;
         }
@@ -282,6 +317,77 @@ public sealed class JavascriptPlanner
         catch (Exception ex)
         {
             throw;
+        }
+    }
+
+    public class TextTools
+    {
+        private readonly IKernel _kernel;
+
+        public TextTools(IKernel kernel)
+        {
+            this._kernel = kernel;
+        }
+
+        [SKFunction]
+        [System.ComponentModel.Description("Extracts details from unstructed text.")]
+        [return: System.ComponentModel.Description("A list of details that have been extracted from the specified text, one for each of the questions provided.")]
+        public TextQuestionsResponse ParseTextForDetails([System.ComponentModel.Description("Context and A list of question to be answered from information in the context.")] TextQuestions questions)
+        {
+            var context =
+                this._kernel.CreateNewContext(
+                    new()
+                    {
+                        { "statements", "" },
+                        { "questions", string.Join("\n", questions.Questions.Select((q, i) => $"{i}: {q}")) },
+                    });
+
+            //ChatHistory chatHistory = new ChatHistory();
+            //IChatCompletion chatCompletion = this._kernel.GetService<IChatCompletion>();
+            //string planResultString = await chatCompletion.GenerateMessageAsync(chatHistory, cancellationToken: cancellationToken).ConfigureAwait(false);
+
+            var result = new List<string>();
+            return new TextQuestionsResponse { Details = result };
+        }
+    }
+
+    [TypeConverter(typeof(JsonTypeConverter<TextQuestions>))]
+    public class TextQuestions
+    {
+        [System.ComponentModel.Description("Questions to answer by extracting details from the previded text.")]
+        public List<string> Questions { get; set; } = new List<string>();
+
+        [System.ComponentModel.Description("The text to be searched.")]
+        public string Text { get; set; }
+    }
+
+    [TypeConverter(typeof(JsonTypeConverter<TextQuestionsResponse>))]
+    public class TextQuestionsResponse
+    {
+        [System.ComponentModel.Description("Details extracted from the specified text. One for each of the questions asked.")]
+        public List<string> Details { get; set; } = new List<string>();
+    }
+
+    private class JsonTypeConverter<T> : TypeConverter
+    {
+        public override bool CanConvertFrom(ITypeDescriptorContext? context, Type sourceType) => true;
+
+        /// <summary>
+        /// This method is used to convert object from string to actual type. This will allow to pass object to
+        /// native function which requires it.
+        /// </summary>
+        public override object? ConvertFrom(ITypeDescriptorContext? context, CultureInfo? culture, object value)
+        {
+            return JsonSerializer.Deserialize((string)value, typeof(T));
+        }
+
+        /// <summary>
+        /// This method is used to convert actual type to string representation, so it can be passed to AI
+        /// for further processing.
+        /// </summary>
+        public override object? ConvertTo(ITypeDescriptorContext? context, CultureInfo? culture, object? value, Type destinationType)
+        {
+            return JsonSerializer.Serialize(value);
         }
     }
 

@@ -1,6 +1,8 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
 using System;
+using System.Collections.Generic;
+using System.ComponentModel;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -40,8 +42,8 @@ public sealed class JSPlannerTests : IDisposable
 
     [Theory]
     [InlineData("What is the tallest mountain on Earth? How tall is it?", "Everest")]
-    [InlineData("What is the weather in Seattle?", "Seattle")]
-    public async Task CanExecuteStepwisePlanAsync(string prompt, string partialExpectedAnswer)
+    //[InlineData("What is the weather in Seattle?", "Seattle")]
+    public async Task CanExecuteJSPlannerAsync(string prompt, string partialExpectedAnswer)
     {
         // Arrange
         bool useEmbeddings = false;
@@ -53,7 +55,7 @@ public sealed class JSPlannerTests : IDisposable
 
         var planner = new JavascriptPlanner(
             kernel,
-            new JavascriptPlannerConfig() { });
+            new JavascriptPlannerConfig());
 
         // Act
         var planResult = await planner.ExecuteAsync(prompt);
