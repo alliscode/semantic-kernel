@@ -15,7 +15,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Json.Schema;
 using Json.Schema.Generation;
-using Microsoft.ClearScript;
 using Microsoft.ClearScript.V8;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel.AI.ChatCompletion;
@@ -23,6 +22,7 @@ using Microsoft.SemanticKernel.Diagnostics;
 using Microsoft.SemanticKernel.Orchestration;
 using Microsoft.SemanticKernel.TemplateEngine;
 using Microsoft.SemanticKernel.TemplateEngine.Basic;
+using Microsoft.SemanticKernel.TemplateEngine.Handlebars;
 
 #pragma warning disable IDE0130
 // ReSharper disable once CheckNamespace - Using NS of Plan
@@ -37,7 +37,7 @@ public sealed class JavascriptPlanner
     private readonly JavascriptPlannerConfig _config;
     private readonly BasicPromptTemplateFactory _promptTemplateFactory;
     private readonly string _initialPlanPromptManifest;
-    private readonly Dictionary<string, object> _pluginDict = new Dictionary<string, object>();
+    private readonly Dictionary<string, object> _pluginDict = new();
 
     private const string RestrictedPluginName = "JavaScriptPlanner_Excluded";
 
@@ -80,8 +80,8 @@ public sealed class JavascriptPlanner
     {
         try
         {
-            var llmToolsPlugin = new TextTools(this._kernel);
-            this._kernel.ImportFunctions(llmToolsPlugin, "textTools");
+            var textToolsPlugin = new TextTools(this._kernel);
+            this._kernel.ImportFunctions(textToolsPlugin, "textTools");
 
             var functionsManual = this.GenerateFunctionDescriptions(this._kernel, cancellationToken);
             var context =
@@ -118,6 +118,7 @@ public sealed class JavascriptPlanner
 
     private string GenerateFunctionDescriptions(IKernel kernel, CancellationToken cancellationToken)
     {
+        AttributeHandler.AddHandler(new SystemAttributeHandler());
         var jsFunctionSigatures = new List<string>();
 
         var functionsByPlugin = this._kernel.Functions.GetFunctionViews()
@@ -182,8 +183,9 @@ public sealed class JavascriptPlanner
                 JsonSchema? returnParameterSchema = null;
                 if (skFunction.ReturnParameter.Schema is null)
                 {
+                    Verify.NotNull(skFunction.ReturnParameter.ParameterType);
                     var returnType = skFunction.ReturnParameter.ParameterType;
-                    if (returnType.BaseType == typeof(Task) && returnType.GenericTypeArguments.Any())
+                    if (returnType.BaseType == typeof(Task) && (returnType.GenericTypeArguments.Length == 0))
                     {
                         returnType = skFunction.ReturnParameter.ParameterType.GenericTypeArguments[0];
                     }
@@ -320,7 +322,7 @@ public sealed class JavascriptPlanner
         }
     }
 
-    public class TextTools
+    private class TextTools
     {
         private readonly IKernel _kernel;
 
@@ -331,8 +333,8 @@ public sealed class JavascriptPlanner
 
         [SKFunction]
         [System.ComponentModel.Description("Extracts details from unstructed text.")]
-        [return: System.ComponentModel.Description("A list of details that have been extracted from the specified text, one for each of the questions provided.")]
-        public TextQuestionsResponse ParseTextForDetails([System.ComponentModel.Description("Context and A list of question to be answered from information in the context.")] TextQuestions questions)
+        [return: System.ComponentModel.Description("A list of details that have been extracted from the provided text, one for each of the questions provided.")]
+        public TextQuestionsResponse ParseTextForDetails([System.ComponentModel.Description("A block of text and questions to ask about the text.")] TextQuestions questions)
         {
             var context =
                 this._kernel.CreateNewContext(
@@ -341,6 +343,21 @@ public sealed class JavascriptPlanner
                         { "statements", "" },
                         { "questions", string.Join("\n", questions.Questions.Select((q, i) => $"{i}: {q}")) },
                     });
+
+            var templateFactory = new HandlebarsPromptTemplateFactory();
+            var handlebarsPrompt = "Hello AI, my name is {{name}}. What is the origin of my name?";
+
+
+            // Create the semantic function with Handlebars
+            var skfunction = kernel.CreateSemanticFunction(
+                promptTemplate: prompt,
+                functionName: "MyFunction",
+                promptTemplateConfig: new PromptTemplateConfig()
+                {
+                    TemplateFormat = templateFormat
+                },
+                promptTemplateFactory:
+            );
 
             //ChatHistory chatHistory = new ChatHistory();
             //IChatCompletion chatCompletion = this._kernel.GetService<IChatCompletion>();
@@ -352,17 +369,17 @@ public sealed class JavascriptPlanner
     }
 
     [TypeConverter(typeof(JsonTypeConverter<TextQuestions>))]
-    public class TextQuestions
+    private class TextQuestions
     {
         [System.ComponentModel.Description("Questions to answer by extracting details from the previded text.")]
         public List<string> Questions { get; set; } = new List<string>();
 
         [System.ComponentModel.Description("The text to be searched.")]
-        public string Text { get; set; }
+        public string Text { get; set; } = "";
     }
 
     [TypeConverter(typeof(JsonTypeConverter<TextQuestionsResponse>))]
-    public class TextQuestionsResponse
+    private class TextQuestionsResponse
     {
         [System.ComponentModel.Description("Details extracted from the specified text. One for each of the questions asked.")]
         public List<string> Details { get; set; } = new List<string>();
@@ -388,6 +405,17 @@ public sealed class JavascriptPlanner
         public override object? ConvertTo(ITypeDescriptorContext? context, CultureInfo? culture, object? value, Type destinationType)
         {
             return JsonSerializer.Serialize(value);
+        }
+    }
+
+    private class SystemAttributeHandler : IAttributeHandler<System.ComponentModel.DescriptionAttribute>
+    {
+        public void AddConstraints(SchemaGenerationContextBase context, Attribute attribute)
+        {
+            if (attribute is System.ComponentModel.DescriptionAttribute descriptionAttribute)
+            {
+                context.Intents.Insert(0, new Json.Schema.Generation.Intents.DescriptionIntent(descriptionAttribute.Description));
+            }
         }
     }
 
