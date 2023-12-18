@@ -4,8 +4,11 @@ using System;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Planning;
+using Microsoft.SemanticKernel.Planning.Stepwise;
 using Microsoft.SemanticKernel.Plugins.Core;
 using Microsoft.SemanticKernel.Plugins.Web;
 using Microsoft.SemanticKernel.Plugins.Web.Bing;
@@ -52,7 +55,7 @@ public sealed class FunctionCallingStepwisePlannerTests : IDisposable
         kernel.ImportPluginFromType<MathPlugin>("Math");
         kernel.ImportPluginFromType<EmailPluginFake>("Email");
 
-        var planner = new FunctionCallingStepwisePlanner(
+        var planner = new OptimisticPlanner(
             new FunctionCallingStepwisePlannerConfig() { MaxIterations = 10 });
 
         // Act

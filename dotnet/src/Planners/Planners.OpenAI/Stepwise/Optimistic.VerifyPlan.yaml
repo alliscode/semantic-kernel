@@ -1,0 +1,33 @@
+template_format: semantic-kernel
+template: |
+  <message role="system">
+  You are an expert at looking at a plan and determining if the plan can successfully accomplish the stated goal. Look at the provided goal and the proposed plan along with the available functions and thinking step by step, determine if the proposed plan is valid and making the best use of the available functions.
+  </message>
+
+  [FUNCTIONS]
+
+  {{$available_functions}}
+
+  [END FUNCTIONS]
+
+  <message role="user">
+  Goal: {{$goal}}
+
+  Proposed Plan:
+  {{$plan}}
+  </message>
+description:     Generate a step-by-step plan to satisfy a given goal
+name:            GeneratePlan
+input_variables:
+  - name:          available_functions
+    description:   A list of functions that can be used to generate the plan
+  - name:          goal
+    description:   The goal to satisfy
+execution_settings:
+  default:  
+    temperature:       0.0
+    top_p:             0.0
+    presence_penalty:  0.0
+    frequency_penalty: 0.0
+    max_tokens:        256
+    stop_sequences:    []
