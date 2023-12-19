@@ -7,7 +7,6 @@ using System.Threading.Tasks;
 using System.Threading;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
-using Microsoft.SemanticKernel.Plugins.OpenApi;
 using static Microsoft.SemanticKernel.Planning.FunctionCallingStepwisePlanner;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
