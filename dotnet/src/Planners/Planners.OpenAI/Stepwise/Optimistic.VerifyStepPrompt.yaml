@@ -1,20 +1,21 @@
 template_format: semantic-kernel
 template: |
   <message role="system">
-  You are an expert at looking at a plan and determining if the plan can successfully accomplish the stated goal. Look at the provided goal and the proposed plan along with the available functions and thinking step by step, determine if the proposed plan is valid and making the best use of the available functions.
+  You are an expert at looking at a plan and analyzing the effectiveness and corectness of a specific step in the plan. Look at the provided goal, the proposed plan, the action taken in the current step, and the result of the current step; think step by step to determine if the result of this step is accurate given the goal of the step, and also effective towards achieving the ultimate goal.
   </message>
-
-  [FUNCTIONS]
-
-  {{$available_functions}}
-
-  [END FUNCTIONS]
 
   <message role="user">
   Goal: {{$goal}}
 
   Proposed Plan:
   {{$plan}}
+
+  Current action:
+  {{$action}}
+
+  Current result:
+  {{$result}}  
+  
   </message>
 
   <message role="system">

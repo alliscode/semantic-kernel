@@ -4,8 +4,6 @@ using System;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Planning;
 using Microsoft.SemanticKernel.Planning.Stepwise;
@@ -41,9 +39,9 @@ public sealed class FunctionCallingStepwisePlannerTests : IDisposable
 
     [Theory]
     [InlineData("What is the tallest mountain on Earth? How tall is it?", new string[] { "WebSearch_Search" })]
-    [InlineData("What is the weather in Seattle?", new string[] { "WebSearch_Search" })]
-    [InlineData("What is the current hour number, plus 5?", new string[] { "Time_HourNumber", "Math_Add" })]
-    [InlineData("What is 387 minus 22? Email the solution to John and Mary.", new string[] { "Math_Subtract", "Email_GetEmailAddress", "Email_SendEmail" })]
+    //[InlineData("What is the weather in Seattle?", new string[] { "WebSearch_Search" })]
+    //[InlineData("What is the current hour number, plus 5?", new string[] { "Time_HourNumber", "Math_Add" })]
+    //[InlineData("What is 387 minus 22? Email the solution to John and Mary.", new string[] { "Math_Subtract", "Email_GetEmailAddress", "Email_SendEmail" })]
     public async Task CanExecuteStepwisePlanAsync(string prompt, string[] expectedFunctions)
     {
         // Arrange

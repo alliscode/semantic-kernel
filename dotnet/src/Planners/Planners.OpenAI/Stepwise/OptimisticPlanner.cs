@@ -13,6 +13,12 @@ using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using Json.More;
 using System;
+using Azure.Core.Serialization;
+using System.Text.Json.Serialization;
+using System.IO;
+using System.Reflection;
+using System.Xml.Linq;
+using System.Runtime.CompilerServices;
 
 namespace Microsoft.SemanticKernel.Planning.Stepwise;
 
@@ -21,7 +27,16 @@ internal class OptimisticOperation
     public string Id { get; set; } = "";
     public Func<Task<FunctionResult>> Function {  get; set; } = () => throw new NotImplementedException();
     public Func<FunctionResult, CancellationToken, Task<bool>> Verification {  get; set; } = (_, _) => throw new NotImplementedException();
-} 
+}
+
+internal class VerifierResponse
+{
+    [JsonPropertyName("isValid")]
+    public bool IsValid { get; set; } = false;
+
+    [JsonPropertyName("reason")]
+    public string Reason { get; set; } = "";
+}
 
 public class OptimisticPlanner
 {
@@ -55,6 +70,8 @@ public class OptimisticPlanner
     private const string InitialPlanKey = "initial_plan";
     private const string GoalKey = "goal";
 
+    private static StreamWriter s_logWriter;
+
     /// <summary>
     /// Initialize a new instance of the <see cref="FunctionCallingStepwisePlanner"/> class.
     /// </summary>
@@ -66,11 +83,15 @@ public class OptimisticPlanner
         this._generatePlanYaml = this.Config.GetPromptTemplate?.Invoke() ?? EmbeddedResource.Read("Stepwise.Optimistic.GeneratePlan.yaml");
         this._verifyPlanPrompt = this.Config.GetPromptTemplate?.Invoke() ?? EmbeddedResource.Read("Stepwise.Optimistic.VerifyPlan.yaml");
         this._stepPrompt = this.Config.GetStepPromptTemplate?.Invoke() ?? EmbeddedResource.Read("Stepwise.Optimistic.StepPrompt.txt");
-        this._verifyStepPrompt = this.Config.GetStepPromptTemplate?.Invoke() ?? EmbeddedResource.Read("Stepwise.Optimistic.VerifyStepPrompt.txt");
+        this._verifyStepPrompt = this.Config.GetStepPromptTemplate?.Invoke() ?? EmbeddedResource.Read("Stepwise.Optimistic.VerifyStepPrompt.yaml");
         this.Config.ExcludedPlugins.Add(StepwisePlannerPluginName);
 
         this._processingTokenSource = new CancellationTokenSource();
         this._verificationTokenSource = new CancellationTokenSource();
+
+        var filePath = @"C:\Users\bentho\OneDrive - Microsoft\scratchpad\sk\Demo\demo1.txt";
+        var fs = File.Create(filePath);
+        s_logWriter = new StreamWriter(fs);
     }
 
     /// <summary>
@@ -103,6 +124,12 @@ public class OptimisticPlanner
         }
     }
 
+    private static void WriteLogLine(string message)
+    {
+        s_logWriter.WriteLine(message);
+        s_logWriter.Flush();
+    }
+
     private void ProcessOperationTasks(CancellationToken cancellationToken)
     {
 #pragma warning disable VSTHRD110 // Observe result of async calls
@@ -127,7 +154,7 @@ public class OptimisticPlanner
             }
 
             int x = 3;
-        });
+        }, cancellationToken);
 #pragma warning restore VSTHRD110 // Observe result of async calls
     }
 
@@ -173,10 +200,12 @@ public class OptimisticPlanner
             [GoalKey] = question
         };
 
+        WriteLogLine("Starting plan generation...");
         var generatePlanResult = await this.ExecuteOperationAsync(
             function: () => kernel.InvokeAsync(generatePlanFunction, generatePlanArgs, cancellationToken),
             verification: (plan, ct) =>
             {
+                WriteLogLine($"Retrieved plan: {plan}");
                 var proposedPlan = plan.GetValue<string>() ?? "";
                 return this.VerifyGeneratedPlanAsync(question, proposedPlan, kernel, logger, ct);
             }, cancellationToken).ConfigureAwait(false);
@@ -186,16 +215,77 @@ public class OptimisticPlanner
 
     private async Task<bool> VerifyGeneratedPlanAsync(string question, string plan, Kernel kernel, ILogger logger, CancellationToken cancellationToken)
     {
-        var generatePlanFunction = kernel.CreateFunctionFromPromptYaml(this._verifyPlanPrompt);
+        WriteLogLine("Starting plan verification");
+        var planVerificationFunction = kernel.CreateFunctionFromPromptYaml(this._verifyPlanPrompt);
         string functionsManual = await this.GetFunctionsManualAsync(kernel, logger, cancellationToken).ConfigureAwait(false);
-        var generatePlanArgs = new KernelArguments
+        var planVerificationArgs = new KernelArguments
         {
             [AvailableFunctionsKey] = functionsManual,
             [GoalKey] = question,
             ["plan"] = plan
         };
-        var generatePlanResult = await kernel.InvokeAsync(generatePlanFunction, generatePlanArgs, cancellationToken).ConfigureAwait(false);
-        return generatePlanResult.GetValue<bool?>() ?? throw new KernelException("Failed get a completion for the plan.");
+
+        var planVerificationResult = await kernel.InvokeAsync(planVerificationFunction, planVerificationArgs, cancellationToken).ConfigureAwait(false);
+
+        try
+        {
+            var parsedResult = JsonSerializer.Deserialize<VerifierResponse>(planVerificationResult.GetValue<string>()!)!;
+            WriteLogLine($"Retrieved plan verification - IsValid: {parsedResult.IsValid}, Reason: {parsedResult.Reason}");
+            return parsedResult.IsValid;
+        }
+        catch (Exception ex)
+        {
+            WriteLogLine($"Plan verification step failed to parse response. Assuming the plan is invalid: {ex}");
+            return planVerificationResult.GetValue<bool?>() ?? throw new KernelException("Failed get a completion for the plan.");
+        }
+    }
+
+    /********************************************************************************************/
+
+    /******************************* Execute and verify step **********************************/
+
+    // Create and invoke a kernel function to generate the initial plan
+    private async Task<object?> ExecuteStepAsync(Kernel kernel, string question, string plan, KernelFunction plugin, KernelArguments? arguments, OpenAIFunctionToolCall functionCall, ILogger logger, CancellationToken cancellationToken)
+    {
+        var stepAction = $"FunctionCall: {functionCall.FunctionName}({string.Join(",", functionCall.Arguments?.Values)})";
+        WriteLogLine($"Starting step execution: {stepAction}");
+        var stepResult = await this.ExecuteOperationAsync(
+            function: () => kernel.InvokeAsync(plugin, arguments, cancellationToken),
+            verification: (step, ct) =>
+            {
+                WriteLogLine($"Retrieved step result: {step}");
+                var stepResult = step.GetValue<string>() ?? "";
+                return this.VerifyStepAsync(question, plan, stepAction, stepResult, kernel, logger, ct);
+            }, cancellationToken).ConfigureAwait(false);
+
+        return stepResult.GetValue<object>();
+    }
+
+    private async Task<bool> VerifyStepAsync(string question, string plan, string action, string result, Kernel kernel, ILogger logger, CancellationToken cancellationToken)
+    {
+        WriteLogLine("Starting step verification");
+        var stepVerificationFunction = kernel.CreateFunctionFromPromptYaml(this._verifyStepPrompt);
+        var stepVerificationArgs = new KernelArguments
+        {
+            [GoalKey] = question,
+            ["plan"] = plan,
+            ["action"] = action,
+            ["result"] = result
+        };
+
+        var stepVerificationResult = await kernel.InvokeAsync(stepVerificationFunction, stepVerificationArgs, cancellationToken).ConfigureAwait(false);
+
+        try
+        {
+            var parsedResult = JsonSerializer.Deserialize<VerifierResponse>(stepVerificationResult.GetValue<string>()!)!;
+            WriteLogLine($"Retrieved step verification - IsValid: {parsedResult.IsValid}, Reason: {parsedResult.Reason}");
+            return parsedResult.IsValid;
+        }
+        catch (Exception ex)
+        {
+            WriteLogLine($"Step verification step failed to parse response. Assuming the step is invalid: {ex}");
+            return stepVerificationResult.GetValue<bool?>() ?? throw new KernelException("Failed get a completion for the step.");
+        }
     }
 
     /********************************************************************************************/
@@ -219,8 +309,6 @@ public class OptimisticPlanner
 
         // Create and invoke a kernel function to generate the initial plan
         var initialPlan = await this.GeneratePlanAsync(question, clonedKernel, logger, cancellationToken).ConfigureAwait(false);
-
-
         var chatHistoryForSteps = await this.BuildChatHistoryForStepAsync(question, initialPlan, clonedKernel, promptTemplateFactory, cancellationToken).ConfigureAwait(false);
 
         for (int i = 0; i < this.Config.MaxIterations; i++)
@@ -278,8 +366,8 @@ public class OptimisticPlanner
                 {
                     try
                     {
-                        // Execute function and add to result to chat history
-                        var result = (await clonedKernel.InvokeAsync(pluginFunction, arguments, cancellationToken).ConfigureAwait(false)).GetValue<object>();
+                        // Execute function and add result to chat history
+                        var result = await this.ExecuteStepAsync(clonedKernel, question, initialPlan, pluginFunction, arguments, functionResponse, logger, cancellationToken).ConfigureAwait(false);
                         chatHistoryForSteps.AddMessage(AuthorRole.Tool, ParseObjectAsString(result), metadata: new Dictionary<string, object?>(1) { { OpenAIChatMessageContent.ToolIdProperty, functionResponse.Id } });
                     }
                     catch (KernelException)

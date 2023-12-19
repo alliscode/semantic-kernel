@@ -20,12 +20,16 @@
   <ItemGroup>
     <None Remove="Stepwise\GeneratePlan.yaml" />
     <None Remove="Stepwise\Optimistic.GeneratePlan.yaml" />
+    <None Remove="Stepwise\Optimistic.Log.yaml" />
     <None Remove="Stepwise\Optimistic.StepPrompt.txt" />
     <None Remove="Stepwise\Optimistic.VerifyPlan.yaml" />
-    <None Remove="Stepwise\Optimistic.VerifyStepPrompt.txt" />
+    <None Remove="Stepwise\Optimistic.VerifyStepPrompt.yaml" />
   </ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="Stepwise\Optimistic.Log.yaml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
     <EmbeddedResource Include="Stepwise\Optimistic.StepPrompt.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </EmbeddedResource>
@@ -38,7 +42,7 @@
     <EmbeddedResource Include="Stepwise\GeneratePlan.yaml">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </EmbeddedResource>
-    <EmbeddedResource Include="Stepwise\Optimistic.VerifyStepPrompt.txt">
+    <EmbeddedResource Include="Stepwise\Optimistic.VerifyStepPrompt.yaml">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </EmbeddedResource>
     <EmbeddedResource Include="Stepwise\StepPrompt.txt">
