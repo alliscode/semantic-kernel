@@ -22,7 +22,7 @@ ChatBot:>
 kernel = sk.Kernel()
 
 api_key, org_id = sk.openai_settings_from_dot_env()
-service_id = "chat-gpt"
+service_id = "chat"
 kernel.add_service(
     sk_oai.OpenAIChatCompletion(service_id=service_id, ai_model_id="gpt-3.5-turbo-1106", api_key=api_key, org_id=org_id)
 )
@@ -56,7 +56,7 @@ chat_history = ChatHistory()
 chat_history.add_user_message("Hi there, who are you?")
 chat_history.add_assistant_message("I am Mosscap, a chat bot. I'm trying to figure out what people need")
 
-chat_function = kernel.create_function_from_prompt(
+chat_function = kernel.add_function(
     plugin_name="ChatBot", function_name="Chat", prompt_template_config=prompt_template_config
 )
 

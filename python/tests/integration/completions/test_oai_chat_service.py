@@ -6,10 +6,9 @@ from openai import AsyncOpenAI
 from test_utils import retry
 
 import semantic_kernel.connectors.ai.open_ai as sk_oai
-from semantic_kernel.connectors.ai.open_ai.utils import (
-    get_tool_call_object,
-)
+from semantic_kernel.connectors.ai.open_ai.utils import get_tool_call_object
 from semantic_kernel.connectors.ai.prompt_execution_settings import PromptExecutionSettings
+from semantic_kernel.contents.chat_history import ChatHistory
 from semantic_kernel.core_plugins.math_plugin import MathPlugin
 from semantic_kernel.prompt_template.prompt_template_config import PromptTemplateConfig
 
@@ -37,7 +36,7 @@ async def test_oai_chat_service_with_plugins(setup_tldr_function_for_oai_models,
     )
 
     # Create the semantic function
-    tldr_function = kernel.create_function_from_prompt(
+    tldr_function = kernel.add_function(
         function_name="story", plugin_name="plugin", prompt_template_config=prompt_template_config
     )
 
@@ -64,7 +63,7 @@ async def test_oai_chat_service_with_tool_call(setup_tldr_function_for_oai_model
         ),
     )
 
-    kernel.import_plugin_from_object(MathPlugin(), plugin_name="math")
+    kernel.add_plugin(MathPlugin(), plugin_name="math")
 
     execution_settings = sk_oai.OpenAIChatPromptExecutionSettings(
         service_id="chat-gpt",
@@ -82,7 +81,7 @@ async def test_oai_chat_service_with_tool_call(setup_tldr_function_for_oai_model
     )
 
     # Create the prompt function
-    tldr_function = kernel.create_function_from_prompt(
+    tldr_function = kernel.add_function(
         function_name="math_fun", plugin_name="math_int_test", prompt_template_config=prompt_template_config
     )
 
@@ -109,7 +108,7 @@ async def test_oai_chat_service_with_tool_call_streaming(setup_tldr_function_for
         ),
     )
 
-    kernel.import_plugin_from_object(MathPlugin(), plugin_name="math")
+    kernel.add_plugin(MathPlugin(), plugin_name="math")
 
     execution_settings = sk_oai.OpenAIChatPromptExecutionSettings(
         service_id="chat-gpt",
@@ -127,7 +126,7 @@ async def test_oai_chat_service_with_tool_call_streaming(setup_tldr_function_for
     )
 
     # Create the prompt function
-    tldr_function = kernel.create_function_from_prompt(
+    tldr_function = kernel.add_function(
         function_name="math_fun", plugin_name="math_int_test", prompt_template_config=prompt_template_config
     )
 
@@ -174,7 +173,7 @@ async def test_oai_chat_service_with_plugins_with_provided_client(setup_tldr_fun
     )
 
     # Create the semantic function
-    tldr_function = kernel.create_function_from_prompt(
+    tldr_function = kernel.add_function(
         function_name="story",
         plugin_name="story_plugin",
         prompt_template_config=prompt_template_config,
@@ -219,7 +218,7 @@ async def test_oai_chat_stream_service_with_plugins(setup_tldr_function_for_oai_
     )
 
     # Create the prompt function
-    tldr_function = kernel.create_function_from_prompt(
+    tldr_function = kernel.add_function(
         function_name="story",
         plugin_name="story_plugin",
         prompt_template_config=prompt_template_config,
@@ -233,3 +232,81 @@ async def test_oai_chat_stream_service_with_plugins(setup_tldr_function_for_oai_
     print(f"TLDR using input string: '{output}'")
     # assert "First Law" not in output and ("human" in output or "Human" in output or "preserve" in output)
     assert 0 < len(output) < 100
+
+
+@pytest.mark.asyncio
+async def test_oai_chat_service_with_yaml_jinja2(setup_tldr_function_for_oai_models, get_oai_config):
+    kernel, _, _ = setup_tldr_function_for_oai_models
+
+    api_key, org_id = get_oai_config
+
+    print("* Service: OpenAI Chat Completion")
+    print("* Endpoint: OpenAI")
+    print("* Model: gpt-3.5-turbo")
+
+    client = AsyncOpenAI(
+        api_key=api_key,
+        organization=org_id,
+    )
+
+    kernel.add_service(
+        sk_oai.OpenAIChatCompletion(
+            service_id="chat-gpt",
+            ai_model_id="gpt-3.5-turbo",
+            async_client=client,
+        ),
+        overwrite=True,  # Overwrite the service if it already exists since add service says it does
+    )
+
+    plugins_directory = os.path.join(os.path.dirname(__file__), "../../assets/test_plugins")
+
+    plugin = kernel.add_plugin(parent_directory=plugins_directory, plugin_name="TestFunctionYamlJinja2")
+    assert plugin is not None
+    assert plugin["TestFunctionJinja2"] is not None
+
+    chat_history = ChatHistory()
+    chat_history.add_system_message("Assistant is a large language model")
+    chat_history.add_user_message("I love parrots.")
+
+    result = await kernel.invoke(plugin["TestFunctionJinja2"], chat_history=chat_history)
+    assert result is not None
+    assert len(str(result.value)) > 0
+
+
+@pytest.mark.asyncio
+async def test_oai_chat_service_with_yaml_handlebars(setup_tldr_function_for_oai_models, get_oai_config):
+    kernel, _, _ = setup_tldr_function_for_oai_models
+
+    api_key, org_id = get_oai_config
+
+    print("* Service: OpenAI Chat Completion")
+    print("* Endpoint: OpenAI")
+    print("* Model: gpt-3.5-turbo")
+
+    client = AsyncOpenAI(
+        api_key=api_key,
+        organization=org_id,
+    )
+
+    kernel.add_service(
+        sk_oai.OpenAIChatCompletion(
+            service_id="chat-gpt",
+            ai_model_id="gpt-3.5-turbo",
+            async_client=client,
+        ),
+        overwrite=True,  # Overwrite the service if it already exists since add service says it does
+    )
+
+    plugins_directory = os.path.join(os.path.dirname(__file__), "../../assets/test_plugins")
+
+    plugin = kernel.add_plugin(parent_directory=plugins_directory, plugin_name="TestFunctionYamlHandlebars")
+    assert plugin is not None
+    assert plugin["TestFunctionHandlebars"] is not None
+
+    chat_history = ChatHistory()
+    chat_history.add_system_message("Assistant is a large language model")
+    chat_history.add_user_message("I love parrots.")
+
+    result = await kernel.invoke(plugin["TestFunctionHandlebars"], chat_history=chat_history)
+    assert result is not None
+    assert len(str(result.value)) > 0

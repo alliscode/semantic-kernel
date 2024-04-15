@@ -5,7 +5,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Examples;
 using Kusto.Cloud.Platform.Utils;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
@@ -14,7 +13,9 @@ using Microsoft.SemanticKernel.Experimental.Agents;
 using Xunit;
 using Xunit.Abstractions;
 
-public class Example79_ChatCompletionAgent : BaseTest
+namespace Examples;
+
+public class Example79_ChatCompletionAgent(ITestOutputHelper output) : BaseTest(output)
 {
     /// <summary>
     /// This example demonstrates a chat with the chat completion agent that utilizes the SK ChatCompletion API to communicate with LLM.
@@ -44,7 +45,7 @@ public class Example79_ChatCompletionAgent : BaseTest
          );
 
         var prompt = PrintPrompt("I need help with my investment portfolio. Please guide me.");
-        PrintConversation(await agent.InvokeAsync(new[] { new ChatMessageContent(AuthorRole.User, prompt) }));
+        PrintConversation(await agent.InvokeAsync([new ChatMessageContent(AuthorRole.User, prompt)]));
     }
 
     /// <summary>
@@ -91,7 +92,7 @@ public class Example79_ChatCompletionAgent : BaseTest
             settings
          );
 
-        var chat = new TurnBasedChat(new[] { fitnessTrainer, stressManagementExpert }, (chatHistory, replies, turn) =>
+        var chat = new TurnBasedChat([fitnessTrainer, stressManagementExpert], (chatHistory, replies, turn) =>
             turn >= 10 || // Limit the number of turns to 10    
             replies.Any(
                 message => message.Role == AuthorRole.Assistant &&
@@ -120,20 +121,14 @@ public class Example79_ChatCompletionAgent : BaseTest
         this.WriteLine();
     }
 
-    private sealed class TurnBasedChat
+    private sealed class TurnBasedChat(IEnumerable<ChatCompletionAgent> agents, Func<ChatHistory, IEnumerable<ChatMessageContent>, int, bool> exitCondition)
     {
-        public TurnBasedChat(IEnumerable<ChatCompletionAgent> agents, Func<ChatHistory, IEnumerable<ChatMessageContent>, int, bool> exitCondition)
-        {
-            this._agents = agents.ToArray();
-            this._exitCondition = exitCondition;
-        }
-
         public async Task<IReadOnlyList<ChatMessageContent>> SendMessageAsync(string message, CancellationToken cancellationToken = default)
         {
             var chat = new ChatHistory();
             chat.AddUserMessage(message);
 
-            IReadOnlyList<ChatMessageContent> result = new List<ChatMessageContent>();
+            IReadOnlyList<ChatMessageContent> result;
 
             var turn = 0;
 
@@ -152,11 +147,7 @@ public class Example79_ChatCompletionAgent : BaseTest
             return chat;
         }
 
-        private readonly ChatCompletionAgent[] _agents;
-        private readonly Func<ChatHistory, IEnumerable<ChatMessageContent>, int, bool> _exitCondition;
-    }
-
-    public Example79_ChatCompletionAgent(ITestOutputHelper output) : base(output)
-    {
+        private readonly ChatCompletionAgent[] _agents = agents.ToArray();
+        private readonly Func<ChatHistory, IEnumerable<ChatMessageContent>, int, bool> _exitCondition = exitCondition;
     }
 }

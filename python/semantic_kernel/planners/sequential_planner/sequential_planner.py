@@ -84,7 +84,7 @@ class SequentialPlanner:
                 settings = prompt_config.execution_settings.pop("default")
                 prompt_config.execution_settings[service_id] = settings
 
-        return self._kernel.create_function_from_prompt(
+        return self._kernel.add_function(
             plugin_name=self.RESTRICTED_PLUGIN_NAME,
             function_name=self.RESTRICTED_PLUGIN_NAME,
             prompt_template_config=prompt_config,
@@ -102,23 +102,20 @@ class SequentialPlanner:
 
         plan_result = await self._function_flow_function.invoke(self._kernel, self._arguments)
 
-        if isinstance(plan_result, FunctionResult) and "error" in plan_result.metadata:
+        if isinstance(plan_result, FunctionResult) and "exception" in plan_result.metadata:
             raise PlannerCreatePlanError(
-                f"Error creating plan for goal: {plan_result.metadata['error']}",
-                plan_result.metadata["error"],
-            )
+                f"Error creating plan for goal: {plan_result.metadata['exception']}",
+            ) from plan_result.metadata["exception"]
 
         plan_result_string = str(plan_result).strip()
 
         try:
-            get_plugin_function = self.config.get_plugin_function or SequentialPlanParser.get_plugin_function(
-                self._kernel
-            )
             plan = SequentialPlanParser.to_plan_from_xml(
-                plan_result_string,
-                goal,
-                get_plugin_function,
-                self.config.allow_missing_functions,
+                xml_string=plan_result_string,
+                goal=goal,
+                kernel=self._kernel,
+                get_plugin_function=self.config.get_plugin_function,
+                allow_missing_functions=self.config.allow_missing_functions,
             )
 
             if len(plan._steps) == 0:

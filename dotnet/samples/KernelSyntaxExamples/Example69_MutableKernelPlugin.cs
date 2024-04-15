@@ -11,7 +11,7 @@ using Xunit.Abstractions;
 namespace Examples;
 
 // This example shows how to create a mutable <see cref="KernelPlugin"/>.
-public class Example69_MutableKernelPlugin : BaseTest
+public class Example69_MutableKernelPlugin(ITestOutputHelper output) : BaseTest(output)
 {
     /// <summary>
     /// Show how to create a mutable <see cref="KernelPlugin"/>.
@@ -52,7 +52,9 @@ public class Example69_MutableKernelPlugin : BaseTest
                 foreach (KernelFunction f in functions)
                 {
                     ArgumentNullException.ThrowIfNull(f);
-                    this._functions.Add(f.Name, f);
+
+                    var cloned = f.Clone(name);
+                    this._functions.Add(cloned.Name, cloned);
                 }
             }
         }
@@ -72,14 +74,12 @@ public class Example69_MutableKernelPlugin : BaseTest
         public void AddFunction(KernelFunction function)
         {
             ArgumentNullException.ThrowIfNull(function);
-            this._functions.Add(function.Name, function);
+
+            var cloned = function.Clone(this.Name);
+            this._functions.Add(cloned.Name, cloned);
         }
 
         /// <inheritdoc/>
         public override IEnumerator<KernelFunction> GetEnumerator() => this._functions.Values.GetEnumerator();
-    }
-
-    public Example69_MutableKernelPlugin(ITestOutputHelper output) : base(output)
-    {
     }
 }

@@ -22,15 +22,8 @@ class PlannerFunctionExtension:
             + (f" (default value: {parameter.default_value})" if parameter.default_value else "")
             for parameter in function.parameters
         ]
-
         inputs = "\n".join(inputs)
-        qualified_name = PlannerFunctionExtension.to_fully_qualified_name(function)
-
-        return f"{qualified_name}:\n  description: {function.description}\n  inputs:\n " f" {inputs}"
-
-    @staticmethod
-    def to_fully_qualified_name(function: KernelFunctionMetadata):
-        return f"{function.plugin_name}-{function.name}"
+        return f"{function.fully_qualified_name}:\n  description: {function.description}\n  inputs:\n " f" {inputs}"
 
     @staticmethod
     def to_embedding_string(function: KernelFunctionMetadata):
@@ -68,7 +61,7 @@ class PlannerKernelExtension:
 
         available_functions = [
             func
-            for func in kernel.plugins.get_list_of_function_metadata()
+            for func in kernel.get_list_of_function_metadata()
             if (func.plugin_name not in excluded_plugins and func.name not in excluded_functions)
         ]
 

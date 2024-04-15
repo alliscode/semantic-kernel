@@ -1,8 +1,11 @@
 # Copyright (c) Microsoft. All rights reserved.
+from __future__ import annotations
 
 import logging
+import os
 from typing import TYPE_CHECKING, Any, AsyncIterable, Dict, List, Optional, Union
 
+import yaml
 from pydantic import Field, ValidationError, model_validator
 
 from semantic_kernel.connectors.ai.chat_completion_client_base import ChatCompletionClientBase
@@ -13,15 +16,16 @@ from semantic_kernel.connectors.ai.prompt_execution_settings import PromptExecut
 from semantic_kernel.connectors.ai.text_completion_client_base import TextCompletionClientBase
 from semantic_kernel.contents.chat_history import ChatHistory
 from semantic_kernel.contents.chat_message_content import ChatMessageContent
-from semantic_kernel.contents.streaming_kernel_content import StreamingKernelContent
+from semantic_kernel.contents.streaming_content_mixin import StreamingContentMixin
 from semantic_kernel.contents.text_content import TextContent
 from semantic_kernel.exceptions import FunctionExecutionException, FunctionInitializationError
 from semantic_kernel.functions.function_result import FunctionResult
 from semantic_kernel.functions.kernel_arguments import KernelArguments
-from semantic_kernel.functions.kernel_function import KernelFunction
+from semantic_kernel.functions.kernel_function import TEMPLATE_FORMAT_MAP, KernelFunction
 from semantic_kernel.functions.kernel_function_metadata import KernelFunctionMetadata
 from semantic_kernel.functions.kernel_parameter_metadata import KernelParameterMetadata
-from semantic_kernel.prompt_template.kernel_prompt_template import KernelPromptTemplate
+from semantic_kernel.prompt_template.const import KERNEL_TEMPLATE_FORMAT_NAME, TEMPLATE_FORMAT_TYPES
+from semantic_kernel.prompt_template.prompt_template_base import PromptTemplateBase
 from semantic_kernel.prompt_template.prompt_template_config import PromptTemplateConfig
 
 if TYPE_CHECKING:
@@ -29,6 +33,8 @@ if TYPE_CHECKING:
 
 logger: logging.Logger = logging.getLogger(__name__)
 
+PROMPT_FILE_NAME = "skprompt.txt"
+CONFIG_FILE_NAME = "config.json"
 PROMPT_RETURN_PARAM = KernelParameterMetadata(
     name="return",
     description="The completion result",
@@ -41,17 +47,17 @@ PROMPT_RETURN_PARAM = KernelParameterMetadata(
 class KernelFunctionFromPrompt(KernelFunction):
     """Semantic Kernel Function from a prompt."""
 
-    prompt_template: KernelPromptTemplate
+    prompt_template: PromptTemplateBase
     prompt_execution_settings: Dict[str, PromptExecutionSettings] = Field(default_factory=dict)
 
     def __init__(
         self,
         function_name: str,
-        plugin_name: str,
+        plugin_name: Optional[str] = None,
         description: Optional[str] = None,
         prompt: Optional[str] = None,
-        template_format: Optional[str] = "semantic-kernel",
-        prompt_template: Optional[KernelPromptTemplate] = None,
+        template_format: TEMPLATE_FORMAT_TYPES = KERNEL_TEMPLATE_FORMAT_NAME,
+        prompt_template: Optional[PromptTemplateBase] = None,
         prompt_template_config: Optional[PromptTemplateConfig] = None,
         prompt_execution_settings: Optional[
             Union[PromptExecutionSettings, List[PromptExecutionSettings], Dict[str, PromptExecutionSettings]]
@@ -89,7 +95,7 @@ through prompt_template_config or in the prompt_template."
                     template=prompt,
                     template_format=template_format,
                 )
-            prompt_template = KernelPromptTemplate(prompt_template_config=prompt_template_config)
+            prompt_template = TEMPLATE_FORMAT_MAP[template_format](prompt_template_config=prompt_template_config)
 
         try:
             metadata = KernelFunctionMetadata(
@@ -172,7 +178,7 @@ through prompt_template_config or in the prompt_template."
         arguments: KernelArguments,
     ) -> FunctionResult:
         """Handles the chat service call."""
-        chat_history = ChatHistory.from_rendered_prompt(prompt, service.get_chat_message_content_class())
+        chat_history = ChatHistory.from_rendered_prompt(prompt, service.get_chat_message_content_type())
 
         # pass the kernel in for auto function calling
         kwargs = {}
@@ -235,7 +241,7 @@ through prompt_template_config or in the prompt_template."
         self,
         kernel: "Kernel",
         arguments: KernelArguments,
-    ) -> AsyncIterable[Union[FunctionResult, List[StreamingKernelContent]]]:
+    ) -> AsyncIterable[Union[FunctionResult, List[StreamingContentMixin]]]:
         """Invokes the function stream with the given arguments."""
         arguments = self.add_default_values(arguments)
         service, execution_settings = kernel.select_ai_service(self, arguments)
@@ -270,7 +276,7 @@ through prompt_template_config or in the prompt_template."
         execution_settings: PromptExecutionSettings,
         prompt: str,
         arguments: KernelArguments,
-    ) -> AsyncIterable[Union[FunctionResult, List[StreamingKernelContent]]]:
+    ) -> AsyncIterable[Union[FunctionResult, List[StreamingContentMixin]]]:
         """Handles the chat service call."""
 
         # pass the kernel in for auto function calling
@@ -281,7 +287,9 @@ through prompt_template_config or in the prompt_template."
             kwargs["kernel"] = kernel
             kwargs["arguments"] = arguments
 
-        chat_history = ChatHistory.from_rendered_prompt(prompt, service.get_chat_message_content_class())
+        chat_history = ChatHistory.from_rendered_prompt(
+            prompt,
+        )
         try:
             async for partial_content in service.complete_chat_stream(
                 chat_history=chat_history,
@@ -300,7 +308,7 @@ through prompt_template_config or in the prompt_template."
         service: TextCompletionClientBase,
         execution_settings: PromptExecutionSettings,
         prompt: str,
-    ) -> AsyncIterable[Union[FunctionResult, List[StreamingKernelContent]]]:
+    ) -> AsyncIterable[Union[FunctionResult, List[StreamingContentMixin]]]:
         """Handles the text service call."""
         try:
             async for partial_content in service.complete_stream(prompt=prompt, settings=execution_settings):
@@ -316,3 +324,80 @@ through prompt_template_config or in the prompt_template."
             if parameter.name not in arguments and parameter.default not in {None, "", False, 0}:
                 arguments[parameter.name] = parameter.default
         return arguments
+
+    @classmethod
+    def from_yaml(cls, yaml_str: str, plugin_name: str | None = None) -> "KernelFunctionFromPrompt":
+        """Creates a new instance of the KernelFunctionFromPrompt class from a YAML string."""
+        try:
+            data = yaml.safe_load(yaml_str)
+        except yaml.YAMLError as exc:  # pragma: no cover
+            raise FunctionInitializationError(f"Invalid YAML content: {yaml_str}, error: {exc}") from exc
+
+        if not isinstance(data, dict):
+            raise FunctionInitializationError(f"The YAML content must represent a dictionary, got {yaml_str}")
+
+        try:
+            prompt_template_config = PromptTemplateConfig(**data)
+        except ValidationError as exc:
+            raise FunctionInitializationError(
+                f"Error initializing PromptTemplateConfig: {exc} from yaml data: {data}"
+            ) from exc
+        return cls(
+            function_name=prompt_template_config.name,
+            plugin_name=plugin_name,
+            description=prompt_template_config.description,
+            prompt_template_config=prompt_template_config,
+            template_format=prompt_template_config.template_format,
+        )
+
+    @classmethod
+    def from_directory(cls, path: str, plugin_name: str | None = None) -> "KernelFunctionFromPrompt":
+        """Creates a new instance of the KernelFunctionFromPrompt class from a directory.
+
+        The directory needs to contain:
+        - A prompt file named `skprompt.txt`
+        - A config file named `config.json`
+
+        Returns:
+            KernelFunctionFromPrompt: The kernel function from prompt
+        """
+        prompt_path = os.path.join(path, PROMPT_FILE_NAME)
+        config_path = os.path.join(path, CONFIG_FILE_NAME)
+        prompt_exists = os.path.exists(prompt_path)
+        config_exists = os.path.exists(config_path)
+        if not config_exists and not prompt_exists:
+            raise FunctionInitializationError(
+                f"{PROMPT_FILE_NAME} and {CONFIG_FILE_NAME} files are required to create a "
+                f"function from a directory, path: {str(path)}."
+            )
+        elif not config_exists:
+            raise FunctionInitializationError(
+                f"{CONFIG_FILE_NAME} files are required to create a function from a directory, "
+                f"path: {str(path)}, prompt file is there."
+            )
+        elif not prompt_exists:
+            raise FunctionInitializationError(
+                f"{PROMPT_FILE_NAME} files are required to create a function from a directory, "
+                f"path: {str(path)}, config file is there."
+            )
+
+        function_name = os.path.basename(path)
+
+        with open(config_path, "r") as config_file:
+            prompt_template_config = PromptTemplateConfig.from_json(config_file.read())
+        prompt_template_config.name = function_name
+
+        with open(prompt_path, "r") as prompt_file:
+            prompt_template_config.template = prompt_file.read()
+
+        prompt_template = TEMPLATE_FORMAT_MAP[prompt_template_config.template_format](  # type: ignore
+            prompt_template_config=prompt_template_config
+        )
+        return cls(
+            function_name=function_name,
+            plugin_name=plugin_name,
+            prompt_template=prompt_template,
+            prompt_template_config=prompt_template_config,
+            template_format=prompt_template_config.template_format,
+            description=prompt_template_config.description,
+        )

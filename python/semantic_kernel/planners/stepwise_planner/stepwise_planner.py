@@ -60,7 +60,6 @@ def is_null_or_empty(value: Optional[str] = None) -> bool:
 
 class StepwisePlanner:
     config: StepwisePlannerConfig
-    _arguments: "KernelArguments"
     _function_flow_function: "KernelFunction"
 
     def __init__(
@@ -87,9 +86,9 @@ class StepwisePlanner:
         prompt_config.template = prompt_template
 
         self._system_step_function = self.import_function_from_prompt(kernel, "StepwiseStep", prompt_config)
-        self._native_functions = self._kernel.import_plugin_from_object(self, RESTRICTED_PLUGIN_NAME)
+        self._native_functions = self._kernel.add_plugin(self, RESTRICTED_PLUGIN_NAME)
 
-        self._context = KernelArguments()
+        self._arguments = KernelArguments()
 
     @property
     def metadata(self) -> KernelFunctionMetadata:
@@ -134,11 +133,12 @@ class StepwisePlanner:
         question: Annotated[str, "The question to answer"],
         function_descriptions: Annotated[List[str], "List of tool descriptions"],
     ) -> FunctionResult:
+        self._arguments["question"] = question
+        self._arguments["function_descriptions"] = function_descriptions
         steps_taken: List[SystemStep] = []
         if not is_null_or_empty(question):
             for i in range(self.config.max_iterations):
                 scratch_pad = self.create_scratch_pad(question, steps_taken)
-
                 self._arguments["agent_scratch_pad"] = scratch_pad
 
                 llm_response = await self._system_step_function.invoke(self._kernel, self._arguments)
@@ -316,7 +316,7 @@ class StepwisePlanner:
     async def invoke_action(self, action_name: str, action_variables: Dict[str, str]) -> str:
         available_functions = self.get_available_functions()
         target_function = next(
-            (f for f in available_functions if self.to_fully_qualified_name(f) == action_name),
+            (f for f in available_functions if f.fully_qualified_name == action_name),
             None,
         )
 
@@ -324,7 +324,7 @@ class StepwisePlanner:
             raise PlannerExecutionException(f"The function '{action_name}' was not found.")
 
         try:
-            function = self._kernel.func(target_function.plugin_name, target_function.name)
+            function = self._kernel.get_function(target_function.plugin_name, target_function.name)
             action_arguments = self.create_action_arguments(action_variables)
 
             result = await function.invoke(self._kernel, action_arguments)
@@ -360,7 +360,7 @@ class StepwisePlanner:
         excluded_functions = self.config.excluded_functions or []
         available_functions = [
             func
-            for func in self._kernel.plugins.get_list_of_function_metadata()
+            for func in self._kernel.get_list_of_function_metadata()
             if (func.plugin_name not in excluded_plugins and func.name not in excluded_functions)
         ]
         available_functions = sorted(available_functions, key=lambda x: (x.plugin_name, x.name))
@@ -379,9 +379,10 @@ class StepwisePlanner:
         function_name: str,
         config: PromptTemplateConfig = None,
     ) -> "KernelFunction":
-        return kernel.create_function_from_prompt(
+        kernel.add_function(
             plugin_name=RESTRICTED_PLUGIN_NAME, function_name=function_name, prompt_template_config=config
         )
+        return kernel.get_function(RESTRICTED_PLUGIN_NAME, function_name)
 
     def to_manual_string(self, function: KernelFunctionMetadata) -> str:
         inputs = [
@@ -391,12 +392,9 @@ class StepwisePlanner:
         ]
         inputs = "\n".join(inputs)
 
-        function_description = function.description.strip()
+        function_description = function.description.strip() if function.description else ""
 
         if is_null_or_empty(inputs):
-            return f"{self.to_fully_qualified_name(function)}: {function_description}\n  inputs: None\n"
+            return f"{function.fully_qualified_name}: {function_description}\n  inputs: None\n"
 
-        return f"{self.to_fully_qualified_name(function)}: {function_description}\n  inputs:\n{inputs}\n"
-
-    def to_fully_qualified_name(self, function: KernelFunctionMetadata):
-        return f"{function.plugin_name}.{function.name}"
+        return f"{function.fully_qualified_name}: {function_description}\n  inputs:\n{inputs}\n"

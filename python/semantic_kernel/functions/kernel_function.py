@@ -1,25 +1,43 @@
 # Copyright (c) Microsoft. All rights reserved.
+from __future__ import annotations
 
 import logging
 from abc import abstractmethod
+from copy import copy, deepcopy
 from typing import TYPE_CHECKING, Any, AsyncIterable, Callable, Dict, List, Optional, Union
 
-from semantic_kernel.contents.streaming_kernel_content import StreamingKernelContent
 from semantic_kernel.functions.function_result import FunctionResult
 from semantic_kernel.functions.kernel_arguments import KernelArguments
 from semantic_kernel.functions.kernel_function_metadata import KernelFunctionMetadata
 from semantic_kernel.functions.kernel_parameter_metadata import KernelParameterMetadata
 from semantic_kernel.kernel_pydantic import KernelBaseModel
+from semantic_kernel.prompt_template.const import (
+    HANDLEBARS_TEMPLATE_FORMAT_NAME,
+    JINJA2_TEMPLATE_FORMAT_NAME,
+    KERNEL_TEMPLATE_FORMAT_NAME,
+    TEMPLATE_FORMAT_TYPES,
+)
+from semantic_kernel.prompt_template.handlebars_prompt_template import HandlebarsPromptTemplate
+from semantic_kernel.prompt_template.jinja2_prompt_template import Jinja2PromptTemplate
+from semantic_kernel.prompt_template.kernel_prompt_template import KernelPromptTemplate
 
 if TYPE_CHECKING:
     from semantic_kernel.connectors.ai.prompt_execution_settings import PromptExecutionSettings
+    from semantic_kernel.contents.streaming_content_mixin import StreamingContentMixin
     from semantic_kernel.functions.kernel_function_from_method import KernelFunctionFromMethod
     from semantic_kernel.functions.kernel_function_from_prompt import KernelFunctionFromPrompt
     from semantic_kernel.kernel import Kernel
-    from semantic_kernel.prompt_template.kernel_prompt_template import KernelPromptTemplate
+    from semantic_kernel.prompt_template.prompt_template_base import PromptTemplateBase
     from semantic_kernel.prompt_template.prompt_template_config import PromptTemplateConfig
 
 logger: logging.Logger = logging.getLogger(__name__)
+
+
+TEMPLATE_FORMAT_MAP = {
+    KERNEL_TEMPLATE_FORMAT_NAME: KernelPromptTemplate,
+    HANDLEBARS_TEMPLATE_FORMAT_NAME: HandlebarsPromptTemplate,
+    JINJA2_TEMPLATE_FORMAT_NAME: Jinja2PromptTemplate,
+}
 
 
 class KernelFunction(KernelBaseModel):
@@ -53,8 +71,8 @@ class KernelFunction(KernelBaseModel):
         plugin_name: str,
         description: Optional[str] = None,
         prompt: Optional[str] = None,
-        template_format: Optional[str] = "semantic-kernel",
-        prompt_template: Optional["KernelPromptTemplate"] = None,
+        template_format: TEMPLATE_FORMAT_TYPES = KERNEL_TEMPLATE_FORMAT_NAME,
+        prompt_template: Optional["PromptTemplateBase"] = None,
         prompt_template_config: Optional["PromptTemplateConfig"] = None,
         prompt_execution_settings: Optional[
             Union["PromptExecutionSettings", List["PromptExecutionSettings"], Dict[str, "PromptExecutionSettings"]]
@@ -101,6 +119,10 @@ class KernelFunction(KernelBaseModel):
     @property
     def plugin_name(self) -> str:
         return self.metadata.plugin_name or ""
+
+    @property
+    def fully_qualified_name(self) -> str:
+        return self.metadata.fully_qualified_name
 
     @property
     def description(self) -> Optional[str]:
@@ -177,7 +199,7 @@ class KernelFunction(KernelBaseModel):
         self,
         kernel: "Kernel",
         arguments: KernelArguments,
-    ) -> AsyncIterable[Union[FunctionResult, List[Union[StreamingKernelContent, Any]]]]:
+    ) -> AsyncIterable[Union[FunctionResult, List[Union["StreamingContentMixin", Any]]]]:
         pass
 
     async def invoke_stream(
@@ -185,7 +207,7 @@ class KernelFunction(KernelBaseModel):
         kernel: "Kernel",
         arguments: Optional[KernelArguments] = None,
         **kwargs: Any,
-    ) -> AsyncIterable[Union[FunctionResult, List[Union[StreamingKernelContent, Any]]]]:
+    ) -> AsyncIterable[Union[FunctionResult, List[Union["StreamingContentMixin", Any]]]]:
         """
         Invoke a stream async function with the given arguments.
 
@@ -207,3 +229,18 @@ class KernelFunction(KernelBaseModel):
         except Exception as e:
             logger.error(f"Error occurred while invoking function {self.name}: {e}")
             yield FunctionResult(function=self.metadata, value=None, metadata={"exception": e, "arguments": arguments})
+
+    def function_copy(self, plugin_name: str | None = None) -> "KernelFunction":
+        """Copy the function, can also override the plugin_name.
+
+        Args:
+            plugin_name (str): The new plugin name.
+
+        Returns:
+            KernelFunction: The copied function.
+        """
+        cop: KernelFunction = copy(self)
+        cop.metadata = deepcopy(self.metadata)
+        if plugin_name:
+            cop.metadata.plugin_name = plugin_name
+        return cop
