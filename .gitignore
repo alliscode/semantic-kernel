@@ -440,6 +440,7 @@ __pycache__/
 __pypackages__/
 .pdm.toml
 global.json
+sk_chat-Data/
 
 # doxfx
 **/DROP/

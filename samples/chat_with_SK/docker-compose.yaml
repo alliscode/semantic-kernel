@@ -1,0 +1,18 @@
+version: "3.8"
+
+services:
+  chroma:
+    image: chromadb/chroma:latest
+    volumes:
+      - ./sk_chat-Data:/chroma/chroma
+    ports:
+      - "8000:8000"
+    environment:
+      - IS_PERSISTENT=TRUE
+      - PERSIST_DIRECTORY=/chroma/chroma
+      - ANONYMIZED_TELEMETRY=${ANONYMIZED_TELEMETRY:-TRUE}
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
