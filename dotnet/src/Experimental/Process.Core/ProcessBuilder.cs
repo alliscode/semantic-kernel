@@ -2,107 +2,136 @@
 
 using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 
-namespace Microsoft.SemanticKernel.Process;
+namespace Microsoft.SemanticKernel;
 
 /// <summary>
 /// Provides functionality for incrementally defining a process.
 /// </summary>
 public class ProcessBuilder : ProcessStepBuilder
 {
+    private readonly List<ProcessStepBuilder> _steps;
+    private readonly List<ProcessStepBuilder> _entrySteps;
+    private readonly Dictionary<string, ProcessStepBuilder> _stepsMap;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ProcessBuilder"/> class.
+    /// </summary>
+    /// <param name="name">The name of the process. This is required.</param>
     public ProcessBuilder(string name)
-        : base(
-              name: name,
-              stepType: typeof(ProcessBuilder).AssemblyQualifiedName!,
-              stateType: typeof(DefaultState).AssemblyQualifiedName!,
-              functions: new List<KernelFunction>())
+        : base(name)
     {
+        this._steps = [];
+        this._entrySteps = [];
+        this._stepsMap = [];
     }
 
-    public string? EntryPointId { get; internal set; }
+    /// <summary>
+    /// A read-only collection of steps in the process.
+    /// </summary>
+    public IReadOnlyList<ProcessStepBuilder> Steps => this._steps.AsReadOnly();
 
-    public IList<ProcessStepBuilder> StepProxies { get; set; } = new();
-
-    public Dictionary<string, ProcessStepBuilder> StepProxiesDict { get; set; } = new();
-
-    public ProcessStepBuilder AddStepFromType<TStep>(string? name = null, string? id = null, bool isEntryPoint = false) where TStep : ProcessStepBase
+    /// <summary>
+    /// Adds a step to the process.
+    /// </summary>
+    /// <typeparam name="TStep">The step Type.</typeparam>
+    /// <param name="name">The name of the step. This parameter is optional.</param>
+    /// <returns>An instance of <see cref="ProcessStepBuilder"/></returns>
+    public ProcessStepBuilder AddStepFromType<TStep>(string? name = null) where TStep : ProcessStepBase
     {
-        string stepId = id ?? Guid.NewGuid().ToString("n");
-        string stepName = name ?? typeof(TStep).Name;
+        var stepBuilder = new ProcessStepBuilder<TStep>(name);
+        this._steps.Add(stepBuilder);
+        this._stepsMap[stepBuilder.Name] = stepBuilder;
 
-        if (isEntryPoint && this.EntryPointId is not null)
-        {
-            throw new InvalidOperationException("An entry point has already been set for this process.");
-        }
-
-        string? stateTypeAqn = null;
-        string stepTypeAqn = typeof(TStep).AssemblyQualifiedName!;
-
-        if (typeof(TStep).IsAssignableFrom(typeof(ProcessStep<>)))
-        {
-            stateTypeAqn = typeof(TStep).GetGenericArguments()[0].AssemblyQualifiedName;
-        }
-        else
-        {
-            stateTypeAqn = typeof(DefaultState).AssemblyQualifiedName;
-        }
-
-
-        if (typeof(TStep).BaseType.IsGenericType && typeof(TStep).BaseType.GetGenericTypeDefinition() == typeof(ProcessStep<>))
-        {
-            stateTypeAqn = typeof(TStep).BaseType.GetGenericArguments()[0].AssemblyQualifiedName;
-        }
-        else
-        {
-            stateTypeAqn = typeof(DefaultState).AssemblyQualifiedName;
-        }
-
-        var kernelPlugin = KernelPluginFactory.CreateFromType<TStep>();
-        var proxy = new ProcessStepBuilder(stepName, stepTypeAqn, stateTypeAqn, kernelPlugin) { Id = stepId };
-
-        if (isEntryPoint)
-        {
-            this.EntryPointId = proxy.Id;
-        }
-
-        this.StepProxies.Add(proxy);
-        this.StepProxiesDict[stepName] = proxy;
-        return proxy;
+        return stepBuilder;
     }
 
+    /// <summary>
+    /// Adds a sub process to the process.
+    /// </summary>
+    /// <param name="kernelProcess">The process to add as a step.</param>
+    /// <returns>An instance of <see cref="ProcessStepBuilder"/></returns>
     public ProcessStepBuilder AddStepFromProcess(ProcessBuilder kernelProcess)
     {
-        this.StepProxies.Add(kernelProcess);
-        this.StepProxiesDict[kernelProcess.Name] = kernelProcess;
+        // TODO: Could this method be converted to an "AddStepFromObject" method takes an
+        // instance of ProcessStepBase and adds it to the process?
+        // This would work for processes.
+        // This would benefit steps because the initial value of state could be captured?
+
+        this._steps.Add(kernelProcess);
+        this._stepsMap[kernelProcess.Name] = kernelProcess;
         return kernelProcess;
     }
 
-    public override IEnumerable<KernelFunction> Functions => this.StepProxies.SelectMany(proxy => proxy.Functions);
+    /// <summary>
+    /// Provides an instance of <see cref="ProcessEdgeBuilder"/> for defining an edge to a
+    /// step inside the process for a given external event.
+    /// </summary>
+    /// <param name="eventId">The Id of the external event.</param>
+    /// <returns>An instance of <see cref="ProcessEdgeBuilder"/></returns>
+    public ProcessEdgeBuilder OnExternalEvent(string eventId)
+    {
+        return new ProcessEdgeBuilder(this, eventId);
+    }
 
-    public override int FunctionCount => base.FunctionCount;
+    /// <summary>
+    /// Used to resolve the target function and parameter for a given optional function name and parameter name.
+    /// This is used to simplify the process of creating a <see cref="ProcessFunctionTarget"/> by making it possible
+    /// to infer the function and/or parameter names from the function metadata if only one option exists.
+    /// </summary>
+    /// <param name="functionName">The name of the function. May be null if only one function exists on the step.</param>
+    /// <param name="parameterName">The name of the parameter. May be null if only one parameter exists on the function.</param>
+    /// <returns>A valid instance of <see cref="ProcessFunctionTarget"/> for this step.</returns>
+    /// <exception cref="InvalidOperationException"></exception>
+    internal override ProcessFunctionTarget ResolveFunctionTarget(string? functionName, string? parameterName)
+    {
+        // Try to resolve the function target on each of the registered entry points.
+        var targets = new List<ProcessFunctionTarget>();
+        foreach (var step in this._entrySteps)
+        {
+            try
+            {
+                targets.Add(step.ResolveFunctionTarget(functionName, parameterName));
+            }
+            catch (InvalidOperationException)
+            {
+                // If the function is not found on the source step, then we can ignore it.
+            }
+        }
 
-    public override bool TryGetFunction(string name, [NotNullWhen(true)] out KernelFunction? function) =>
-        this.Functions.ToDictionary(f => f.Name).TryGetValue(name, out function);
+        // If no targets were found or if multiple targets were found, throw an exception.
+        if (targets.Count == 0)
+        {
+            throw new InvalidOperationException($"No targets found for the specified function and parameter '{functionName}.{parameterName}'.");
+        }
+        else if (targets.Count > 1)
+        {
+            throw new InvalidOperationException($"Multiple targets found for the specified function and parameter '{functionName}.{parameterName}'.");
+        }
 
-    //public override ProcessDto ToDto()
-    //{
-    //    // TODO: All the validations
-    //    if (this.EntryPointId is null)
-    //    {
-    //        throw new InvalidOperationException("An entry point must be set for the process.");
-    //    }
+        return targets[0];
+    }
 
-    //    return new ProcessDto
-    //    {
-    //        Id = this.Id,
-    //        Name = this.Name,
-    //        StepProxies = this.StepProxies.Select(proxy => proxy.ToDto()).ToList(),
-    //        StepType = typeof(ProcessBuilder).AssemblyQualifiedName!,
-    //        State = typeof(DefaultState).AssemblyQualifiedName!,
-    //        OutputEdges = this.OutputEdges.Select(kvp => new KeyValuePair<string, List<EdgeDto>>(kvp.Key, kvp.Value.Select(edge => edge.ToDto()).ToList())).ToDictionary(),
-    //        EntryPointId = this.EntryPointId
-    //    };
-    //}
+    /// <inheritdoc/>
+    internal override void LinkTo(string eventId, ProcessFunctionTargetBuilder functionTarget)
+    {
+        // Keep track of the entry point steps
+        this._entrySteps.Add(functionTarget.Step);
+        base.LinkTo(eventId, functionTarget);
+    }
+
+    /// <inheritdoc/>
+    internal override string GetScopedEventId(string eventId)
+    {
+        return $"{this.Name}.{eventId}";
+    }
+
+    /// <inheritdoc/>
+    internal override Dictionary<string, KernelFunctionMetadata> GetFuctionMetadataMap()
+    {
+        // Merge the function metadata map from each of the entry steps
+        return this._entrySteps.SelectMany(step => step.GetFuctionMetadataMap())
+                               .ToDictionary(pair => pair.Key, pair => pair.Value);
+    }
 }

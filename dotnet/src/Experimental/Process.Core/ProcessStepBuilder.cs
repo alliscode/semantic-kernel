@@ -22,31 +22,31 @@ public abstract class ProcessStepBuilder
     /// <summary>
     /// The name of the step. This is intended to be a human-readable name and is not required to be unique.
     /// </summary>
-    public string? Name { get; init; }
+    public string Name { get; init; }
 
     /// <summary>
     /// A mapping of event Ids to the edges that are triggered by those events.
     /// </summary>
-    protected Dictionary<string, List<ProcessEdgeBuilder>> Edges { get; init; }
+    protected Dictionary<string, List<ProcessStepEdgeBuilder>> Edges { get; init; }
 
     /// <summary>
     /// Define the behavior of the step when the event with the specified Id is fired.
     /// </summary>
     /// <param name="eventId">The Id of the event of interest.</param>
-    /// <returns>An instance of <see cref="ProcessEdgeBuilder"/>.</returns>
-    public virtual ProcessEdgeBuilder OnEvent(string eventId)
+    /// <returns>An instance of <see cref="ProcessStepEdgeBuilder"/>.</returns>
+    public virtual ProcessStepEdgeBuilder OnEvent(string eventId)
     {
         // scope the event to this instance of this step
         var scopedEventId = this.GetScopedEventId(eventId);
-        return new ProcessEdgeBuilder(this, scopedEventId);
+        return new ProcessStepEdgeBuilder(this, scopedEventId);
     }
 
     /// <summary>
     /// Define the behavior of the step when the specified function has been successfully invoked.
     /// </summary>
     /// <param name="functionName">The name of the function of interest.</param>
-    /// <returns>An instance of <see cref="ProcessEdgeBuilder"/>.</returns>
-    public virtual ProcessEdgeBuilder OnFunctionResult(string functionName)
+    /// <returns>An instance of <see cref="ProcessStepEdgeBuilder"/>.</returns>
+    public virtual ProcessStepEdgeBuilder OnFunctionResult(string functionName)
     {
         return this.OnEvent($"{functionName}.OnResult");
     }
@@ -56,38 +56,18 @@ public abstract class ProcessStepBuilder
     /// </summary>
     /// <param name="eventId">The Id of the event.</param>
     /// <param name="functionTarget">The targeted function.</param>
-    internal void LinkTo(string eventId, ProcessFunctionTargetBuilder functionTarget)
+    internal virtual void LinkTo(string eventId, ProcessFunctionTargetBuilder functionTarget)
     {
         var outputTargets = new List<ProcessFunctionTargetBuilder> { functionTarget };
-        var edge = new ProcessEdgeBuilder(this, eventId);
+        var edge = new ProcessStepEdgeBuilder(this, eventId);
 
-        if (!this.Edges.TryGetValue(eventId, out List<ProcessEdgeBuilder>? edges) || edges == null)
+        if (!this.Edges.TryGetValue(eventId, out List<ProcessStepEdgeBuilder>? edges) || edges == null)
         {
             edges = [];
             this.Edges[eventId] = edges;
         }
 
         edges.Add(edge);
-    }
-
-    /// <summary>
-    /// Attempts to retrieve the metadata for the function with the specified name.
-    /// </summary>
-    /// <param name="functionName">The name of the function.</param>
-    /// <param name="kernelFunctionMetadata">The associated <see cref="KernelFunctionMetadata"/></param>
-    /// <returns>True if the specified function metata is present, false otherwise.</returns>
-    internal bool TryGetFunctionMetadata(string functionName, out KernelFunctionMetadata? kernelFunctionMetadata)
-    {
-        return this._functionsDict.TryGetValue(functionName, out kernelFunctionMetadata);
-    }
-
-    /// <summary>
-    /// Returns the number of functions that have been defined for this step.
-    /// </summary>
-    /// <returns>An <see cref="int"/> indicating the number of functions.</returns>
-    internal int GetFunctionCount()
-    {
-        return this._functionsDict.Count;
     }
 
     /// <summary>
@@ -99,7 +79,7 @@ public abstract class ProcessStepBuilder
     /// <param name="parameterName">The name of the parameter. May be null if only one parameter exists on the function.</param>
     /// <returns>A valid instance of <see cref="ProcessFunctionTarget"/> for this step.</returns>
     /// <exception cref="InvalidOperationException"></exception>
-    internal ProcessFunctionTarget ResolveFunctionTarget(string? functionName, string? parameterName)
+    internal virtual ProcessFunctionTarget ResolveFunctionTarget(string? functionName, string? parameterName)
     {
         string? verifiedFunctionName = functionName;
         string? verifiedParameterName = parameterName;
@@ -154,21 +134,25 @@ public abstract class ProcessStepBuilder
     /// </summary>
     /// <param name="eventId">The Id of the event.</param>
     /// <returns>An Id that represents the provided event Id scoped to this step instance.</returns>
-    protected abstract string GetScopedEventId(string eventId);
+    internal abstract string GetScopedEventId(string eventId);
 
     /// <summary>
     /// Loads a mapping of function names to the associated functions metadata.
     /// </summary>
     /// <returns>A <see cref="Dictionary{TKey, TValue}"/> where TKey is <see cref="string"/> and TValue is <see cref="KernelFunctionMetadata"/></returns>
-    protected abstract Dictionary<string, KernelFunctionMetadata> GetFuctionMetadataMap();
+    internal abstract Dictionary<string, KernelFunctionMetadata> GetFuctionMetadataMap();
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ProcessStepBuilder"/> class.
     /// </summary>
-    protected ProcessStepBuilder()
+    /// <param name="name">The name of the step.</param>
+    protected ProcessStepBuilder(string name)
     {
+        this.Name ??= name;
+        Verify.NotNullOrWhiteSpace(name);
+
         this.Id = Guid.NewGuid().ToString("n");
-        this.Edges = new Dictionary<string, List<ProcessEdgeBuilder>>(StringComparer.OrdinalIgnoreCase);
+        this.Edges = new Dictionary<string, List<ProcessStepEdgeBuilder>>(StringComparer.OrdinalIgnoreCase);
         this._functionsDict = new Dictionary<string, KernelFunctionMetadata>(StringComparer.OrdinalIgnoreCase);
     }
 }
@@ -184,20 +168,20 @@ public sealed class ProcessStepBuilder<TStep> : ProcessStepBuilder where TStep :
     /// <summary>
     /// Creates a new instance of the <see cref="ProcessStepBuilder"/> class.
     /// </summary>
-    public ProcessStepBuilder()
+    public ProcessStepBuilder(string? name = null)
+        : base(name ?? typeof(TStep).Name)
     {
-        this.Name ??= typeof(TStep).Name;
         this._eventNamespace = $"{this.Name}_{this.Id}";
     }
 
     /// <inheritdoc/>
-    protected override string GetScopedEventId(string eventId)
+    internal override string GetScopedEventId(string eventId)
     {
         return $"{this._eventNamespace}.{eventId}";
     }
 
     /// <inheritdoc/>
-    protected override Dictionary<string, KernelFunctionMetadata> GetFuctionMetadataMap()
+    internal override Dictionary<string, KernelFunctionMetadata> GetFuctionMetadataMap()
     {
         // TODO: Should not have to create a new instance of the step to get the functions metadata.
         var functions = KernelPluginFactory.CreateFromType<TStep>();
