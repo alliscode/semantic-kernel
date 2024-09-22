@@ -2,12 +2,12 @@
 
 using System.Collections.Generic;
 
-namespace Microsoft.SemanticKernel.Process;
+namespace Microsoft.SemanticKernel;
 
 /// <summary>
 /// A serializable representation of a Process.
 /// </summary>
-public class Process : ProcessStep<ProcessState>
+public class KernelProcess : ProcessStep<ProcessState>
 {
     /// <summary>
     /// The collection of Steps in the Process.
@@ -20,15 +20,15 @@ public class Process : ProcessStep<ProcessState>
     public string EntryPointId { get; init; }
 
     /// <summary>
-    /// Creates a new instance of the <see cref="Process"/> class.
+    /// Creates a new instance of the <see cref="KernelProcess"/> class.
     /// </summary>
     /// <param name="name">The human friendly name of the Process.</param>
-    public Process(string name)
+    public KernelProcess(string name)
     {
+        Verify.NotNull(this.Steps);
         Verify.NotNullOrWhiteSpace(name, nameof(name));
         Verify.NotNullOrWhiteSpace(this.EntryPointId, nameof(this.EntryPointId));
 
-        this.Steps = new List<ProcessStep>();
         this.State.State = new ProcessState
         {
             Name = name

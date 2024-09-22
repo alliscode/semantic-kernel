@@ -9,8 +9,7 @@ namespace Microsoft.SemanticKernel;
 /// <summary>
 /// Base implementation of a Step in a Process.
 /// </summary>
-/// <typeparam name="TState">The type used for persisted state.</typeparam>
-public abstract class ProcessStepBase<TState> where TState : class, new()
+public abstract class ProcessStepBase
 {
     /// <summary>
     /// A mapping of output edges from the Step using the .
@@ -20,23 +19,7 @@ public abstract class ProcessStepBase<TState> where TState : class, new()
     /// <summary>
     /// The state object of type TState.
     /// </summary>
-    internal TState State { get; init; }
-
-    /// <summary>
-    /// Called when the Step is activated.
-    /// </summary>
-    /// <param name="state">An instance of the state that holds state data for the step.</param>
-    /// <returns>An instance of <see cref="ValueTask"/></returns>
-    internal abstract ValueTask _ActivateAsync(TState state);
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="ProcessStepBase{TState}"/> class.
-    /// </summary>
-    protected ProcessStepBase()
-    {
-        this.State = new TState();
-        this._outputEdges = new Dictionary<string, List<ProcessEdge>>();
-    }
+    internal ProcessStepState State { get; init; }
 
     /// <summary>
     /// A read-only collection of event Ids that this Step can emit.
@@ -57,23 +40,40 @@ public abstract class ProcessStepBase<TState> where TState : class, new()
 
         return new List<ProcessEdge>().AsReadOnly();
     }
+
+    /// <summary>
+    /// Called when the Step is activated.
+    /// </summary>
+    /// <param name="state">An instance of the state that holds state data for the step.</param>
+    /// <returns>An instance of <see cref="ValueTask"/></returns>
+    internal abstract ValueTask _ActivateAsync(ProcessStepState state);
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ProcessStepBase"/> class.
+    /// </summary>
+    protected ProcessStepBase()
+    {
+        Verify.NotNull(this.State);
+        this._outputEdges = new Dictionary<string, List<ProcessEdge>>();
+    }
 }
 
 /// <summary>
 /// Process Step. Derive from this class to create a new Step for a Process.
 /// </summary>
-public abstract class ProcessStep : ProcessStepBase<ProcessStepState>
+public abstract class ProcessStep : ProcessStepBase
 {
     /// <inheritdoc/>
     internal override ValueTask _ActivateAsync(ProcessStepState state)
     {
+        Verify.NotNull(state);
         return this.ActivateAsync(state);
     }
 
     /// <inheritdoc/>
     public virtual ValueTask ActivateAsync(ProcessStepState state)
     {
-        return this._ActivateAsync(state);
+        return default;
     }
 }
 
@@ -81,20 +81,23 @@ public abstract class ProcessStep : ProcessStepBase<ProcessStepState>
 /// Process Step. Derive from this class to create a new Step with user-defined state of type TState for a Process.
 /// </summary>
 /// <typeparam name="TState">An instance of TState used for user-defined state.</typeparam>
-public abstract class ProcessStep<TState> : ProcessStepBase<ProcessStepState<TState>> where TState : class, new()
+public abstract class ProcessStep<TState> : ProcessStepBase where TState : class, new()
 {
+    internal new ProcessStepState<TState> State => this.State as ProcessStepState<TState>;
+
     /// <inheritdoc/>
-    internal override ValueTask _ActivateAsync(ProcessStepState<TState> state)
+    internal override ValueTask _ActivateAsync(ProcessStepState state)
     {
-        Verify.NotNull(state);
+        var genericState = state as ProcessStepState<TState>;
+        Verify.NotNull(genericState);
 
         // initialize the state if it is null
-        if (state.State is null)
+        if (genericState.State is null)
         {
-            state.State = new TState();
+            genericState.State = new TState();
         }
 
-        return this.ActivateAsync(state);
+        return this.ActivateAsync(genericState);
     }
 
     /// <inheritdoc/>

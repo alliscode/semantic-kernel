@@ -2,102 +2,205 @@
 
 using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 
 namespace Microsoft.SemanticKernel;
 
 /// <summary>
-/// Provides functionality for incrementally defining a process step.
+/// Provides functionality for incrementally defining a process step and linking it to other steps within a Process.
 /// </summary>
-public class ProcessStepBuilder
+public abstract class ProcessStepBuilder
 {
-    private readonly IEnumerable<KernelFunction> _functions;
-    private readonly Dictionary<string, KernelFunction> _functionsDict;
-    private string _eventNamespace;
+    /// <summary>A mapping of function names to the functions themselves.</summary>
+    private readonly Dictionary<string, KernelFunctionMetadata> _functionsDict;
 
+    /// <summary>
+    /// The unique identifier for the step.
+    /// </summary>
     public string? Id { get; init; }
 
-    public string Name { get; init; }
+    /// <summary>
+    /// The name of the step. This is intended to be a human-readable name and is not required to be unique.
+    /// </summary>
+    public string? Name { get; init; }
 
-    public Type? StepType { get; init; }
+    /// <summary>
+    /// A mapping of event Ids to the edges that are triggered by those events.
+    /// </summary>
+    protected Dictionary<string, List<ProcessEdgeBuilder>> Edges { get; init; }
 
-    public Type? StateType { get; init; }
-
-    public IDictionary<string, IList<ProcessEdgeBuilder>> OutputEdges { get; set; }
-
-    public ProcessStepBuilder(string name, string stepType, string stateType, IEnumerable<KernelFunction> functions)
-    {
-        this.Name = name;
-        this.StepType = stepType;
-        this.StateType = stateType;
-        this.OutputEdges = new();
-
-        this._functions = functions;
-        this._eventNamespace = $"{name}_{this.Id}";
-        this._functionsDict = new Dictionary<string, KernelFunction>(StringComparer.OrdinalIgnoreCase);
-
-        if (functions is not null)
-        {
-            foreach (KernelFunction f in functions)
-            {
-                Validator.ThrowIfNull(f);
-
-                var cloned = f.Clone(name);
-                this._functionsDict.Add(cloned.Name, cloned);
-            }
-        }
-    }
-
-    public virtual ProcessEdgeBuilder OnEvent(string eventType)
+    /// <summary>
+    /// Define the behavior of the step when the event with the specified Id is fired.
+    /// </summary>
+    /// <param name="eventId">The Id of the event of interest.</param>
+    /// <returns>An instance of <see cref="ProcessEdgeBuilder"/>.</returns>
+    public virtual ProcessEdgeBuilder OnEvent(string eventId)
     {
         // scope the event to this instance of this step
-        var scopedEventId = this.StepScopedEventId(eventType);
+        var scopedEventId = this.GetScopedEventId(eventId);
         return new ProcessEdgeBuilder(this, scopedEventId);
     }
 
+    /// <summary>
+    /// Define the behavior of the step when the specified function has been successfully invoked.
+    /// </summary>
+    /// <param name="functionName">The name of the function of interest.</param>
+    /// <returns>An instance of <see cref="ProcessEdgeBuilder"/>.</returns>
     public virtual ProcessEdgeBuilder OnFunctionResult(string functionName)
     {
         return this.OnEvent($"{functionName}.OnResult");
     }
 
-    //public virtual StepDto ToDto()
-    //{
-    //    ArgumentNullException.ThrowIfNull(this.Id);
-
-    //    return new StepDto
-    //    {
-    //        Id = this.Id,
-    //        Name = this.Name,
-    //        StepType = this.StepType,
-    //        State = this.StateType,
-    //        OutputEdges = this.OutputEdges.Select(kvp => new KeyValuePair<string, List<EdgeDto>>(kvp.Key, kvp.Value.Select(edge => edge.ToDto()).ToList())).ToDictionary(),
-    //    };
-    //}
-
-    public virtual IEnumerable<KernelFunction> Functions => this._functions;
-
-    public virtual int FunctionCount => this._functionsDict.Count;
-
-    public virtual bool TryGetFunction(string name, [NotNullWhen(true)] out KernelFunction? function) =>
-        this._functionsDict.TryGetValue(name, out function);
-
-    internal void LinkTo(string eventType, ProcessFunctionTarget functionTarget)
+    /// <summary>
+    /// Links the output of the current step to the an input of another step via the specified event type.
+    /// </summary>
+    /// <param name="eventId">The Id of the event.</param>
+    /// <param name="functionTarget">The targeted function.</param>
+    internal void LinkTo(string eventId, ProcessFunctionTargetBuilder functionTarget)
     {
-        var outputTargets = new List<OutputTarget2> { functionTarget };
-        var edge = new Edge2(this, outputTargets);
+        var outputTargets = new List<ProcessFunctionTargetBuilder> { functionTarget };
+        var edge = new ProcessEdgeBuilder(this, eventId);
 
-        if (!this.OutputEdges.TryGetValue(eventType, out List<Edge2>? edges) || edges == null)
+        if (!this.Edges.TryGetValue(eventId, out List<ProcessEdgeBuilder>? edges) || edges == null)
         {
             edges = [];
-            this.OutputEdges[eventType] = edges;
+            this.Edges[eventId] = edges;
         }
 
         edges.Add(edge);
     }
 
-    private string StepScopedEventId(string eventType)
+    /// <summary>
+    /// Attempts to retrieve the metadata for the function with the specified name.
+    /// </summary>
+    /// <param name="functionName">The name of the function.</param>
+    /// <param name="kernelFunctionMetadata">The associated <see cref="KernelFunctionMetadata"/></param>
+    /// <returns>True if the specified function metata is present, false otherwise.</returns>
+    internal bool TryGetFunctionMetadata(string functionName, out KernelFunctionMetadata? kernelFunctionMetadata)
     {
-        return $"{this._eventNamespace}.{eventType}";
+        return this._functionsDict.TryGetValue(functionName, out kernelFunctionMetadata);
+    }
+
+    /// <summary>
+    /// Returns the number of functions that have been defined for this step.
+    /// </summary>
+    /// <returns>An <see cref="int"/> indicating the number of functions.</returns>
+    internal int GetFunctionCount()
+    {
+        return this._functionsDict.Count;
+    }
+
+    /// <summary>
+    /// Used to resolve the target function and parameter for a given optional function name and parameter name.
+    /// This is used to simplify the process of creating a <see cref="ProcessFunctionTarget"/> by making it possible
+    /// to infer the function and/or parameter names from the function metadata if only one option exists.
+    /// </summary>
+    /// <param name="functionName">The name of the function. May be null if only one function exists on the step.</param>
+    /// <param name="parameterName">The name of the parameter. May be null if only one parameter exists on the function.</param>
+    /// <returns>A valid instance of <see cref="ProcessFunctionTarget"/> for this step.</returns>
+    /// <exception cref="InvalidOperationException"></exception>
+    internal ProcessFunctionTarget ResolveFunctionTarget(string? functionName, string? parameterName)
+    {
+        string? verifiedFunctionName = functionName;
+        string? verifiedParameterName = parameterName;
+
+        // If the function name is null or whitespace, then there can only one function on the step
+        if (string.IsNullOrWhiteSpace(verifiedFunctionName))
+        {
+            if (this._functionsDict.Count > 1)
+            {
+                throw new InvalidOperationException("The target step has more than one function, so a function name must be provided.");
+            }
+
+            verifiedFunctionName = this._functionsDict.Keys.First();
+        }
+
+        // Verify that the target function exists
+        if (!this._functionsDict.TryGetValue(verifiedFunctionName!, out var kernelFunctionMetadata) || kernelFunctionMetadata is null)
+        {
+            throw new InvalidOperationException($"The function {functionName} does not exist on step {this.Name}");
+        }
+
+        // If the parameter name is null or whitespace, then the function must have 0 or 1 parameters
+        if (string.IsNullOrWhiteSpace(verifiedParameterName))
+        {
+            var undeterminedParameters = kernelFunctionMetadata.Parameters.Where(p => p.ParameterType != typeof(ProcessStepContext)).ToList();
+
+            if (undeterminedParameters.Count > 1)
+            {
+                throw new InvalidOperationException($"The function {functionName} on step {this.Name} has more than one parameter, so a parameter name must be provided.");
+            }
+
+            // We can infer the parameter name from the function metadata
+            if (undeterminedParameters.Count == 1)
+            {
+                parameterName = undeterminedParameters[0].Name;
+                verifiedParameterName = parameterName;
+            }
+        }
+
+        Verify.NotNull(verifiedFunctionName);
+
+        return new ProcessFunctionTarget
+        {
+            StepId = this.Id!,
+            FunctionName = verifiedFunctionName,
+            ParameterName = verifiedParameterName
+        };
+    }
+
+    /// <summary>
+    /// Given an event Id, returns a scoped event Id that is unique to this instance of the step.
+    /// </summary>
+    /// <param name="eventId">The Id of the event.</param>
+    /// <returns>An Id that represents the provided event Id scoped to this step instance.</returns>
+    protected abstract string GetScopedEventId(string eventId);
+
+    /// <summary>
+    /// Loads a mapping of function names to the associated functions metadata.
+    /// </summary>
+    /// <returns>A <see cref="Dictionary{TKey, TValue}"/> where TKey is <see cref="string"/> and TValue is <see cref="KernelFunctionMetadata"/></returns>
+    protected abstract Dictionary<string, KernelFunctionMetadata> GetFuctionMetadataMap();
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ProcessStepBuilder"/> class.
+    /// </summary>
+    protected ProcessStepBuilder()
+    {
+        this.Id = Guid.NewGuid().ToString("n");
+        this.Edges = new Dictionary<string, List<ProcessEdgeBuilder>>(StringComparer.OrdinalIgnoreCase);
+        this._functionsDict = new Dictionary<string, KernelFunctionMetadata>(StringComparer.OrdinalIgnoreCase);
+    }
+}
+
+/// <summary>
+/// Provides functionality for incrementally defining a process step.
+/// </summary>
+public sealed class ProcessStepBuilder<TStep> : ProcessStepBuilder where TStep : ProcessStepBase
+{
+    /// <summary>The namespace for events that are scoped to this step.</summary>
+    private readonly string _eventNamespace;
+
+    /// <summary>
+    /// Creates a new instance of the <see cref="ProcessStepBuilder"/> class.
+    /// </summary>
+    public ProcessStepBuilder()
+    {
+        this.Name ??= typeof(TStep).Name;
+        this._eventNamespace = $"{this.Name}_{this.Id}";
+    }
+
+    /// <inheritdoc/>
+    protected override string GetScopedEventId(string eventId)
+    {
+        return $"{this._eventNamespace}.{eventId}";
+    }
+
+    /// <inheritdoc/>
+    protected override Dictionary<string, KernelFunctionMetadata> GetFuctionMetadataMap()
+    {
+        // TODO: Should not have to create a new instance of the step to get the functions metadata.
+        var functions = KernelPluginFactory.CreateFromType<TStep>();
+        return functions.ToDictionary(f => f.Name, f => f.Metadata);
     }
 }

@@ -10,14 +10,10 @@ public record ProcessFunctionTarget
     /// <summary>
     /// Creates an instance of the <see cref="ProcessFunctionTarget"/> class.
     /// </summary>
-    /// <param name="stepId">The unique Id of the Step being targeted.</param>
-    /// <param name="functionName">The name of Kernel Function being targeted.</param>
-    /// <param name="parameterName">The name of the parameter being targeted.</param>
-    public ProcessFunctionTarget(string stepId, string functionName, string? parameterName)
+    public ProcessFunctionTarget()
     {
-        this.StepId = stepId;
-        this.FunctionName = functionName;
-        this.ParameterName = parameterName;
+        Verify.NotNullOrWhiteSpace(this.StepId);
+        Verify.NotNullOrWhiteSpace(this.FunctionName);
     }
 
     /// <summary>
@@ -31,7 +27,7 @@ public record ProcessFunctionTarget
     public string FunctionName { get; init; }
 
     /// <summary>
-    /// The name of the parameter to target.
+    /// The name of the parameter to target. This may be null if the function has no parameters.
     /// </summary>
     public string? ParameterName { get; init; }
 }

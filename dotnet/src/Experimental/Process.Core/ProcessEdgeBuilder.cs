@@ -17,13 +17,14 @@ public class ProcessEdgeBuilder
         this._eventType = eventType;
     }
 
-    public void SendOutputTo(OutputTarget2 outputTarget)
+    public void SendOutputTo(ProcessFunctionTargetBuilder outputTarget)
     {
         this._source.LinkTo(this._eventType, outputTarget);
     }
 
-    public void SendOutputTo(ProcessStepBuilder step, string? function = null, string? parameter = null)
+    public void SendOutputTo<TTargetStep>(ProcessStepBuilder<TTargetStep> step, string? function = null, string? parameter = null)
+        where TTargetStep : ProcessStepBase
     {
-        this._source.LinkTo(this._eventType, new OutputTarget2(step, function, parameter));
+        this._source.LinkTo(this._eventType, new ProcessFunctionTargetBuilder(step, function, parameter));
     }
 }
