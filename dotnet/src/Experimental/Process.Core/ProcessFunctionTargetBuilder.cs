@@ -18,6 +18,14 @@ public sealed class ProcessFunctionTargetBuilder
         Verify.NotNull(step);
         this.Step = step;
 
+        // If the step is an EndStep, we don't need to resolve the function target.
+        if (step is EndStep)
+        {
+            this.FunctionName = string.Empty;
+            this.ParameterName = null;
+            return;
+        }
+
         var target = step.ResolveFunctionTarget(functionName, parameterName);
         Verify.NotNull(target);
 

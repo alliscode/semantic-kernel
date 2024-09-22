@@ -51,10 +51,11 @@ public abstract class ProcessStepBase
     /// <summary>
     /// Initializes a new instance of the <see cref="ProcessStepBase"/> class.
     /// </summary>
-    protected ProcessStepBase()
+    protected ProcessStepBase(ProcessStepState state)
     {
-        Verify.NotNull(this.State);
-        this._outputEdges = new Dictionary<string, List<ProcessEdge>>();
+        Verify.NotNull(state);
+        this.State = state;
+        this._outputEdges = [];
     }
 }
 
@@ -74,6 +75,15 @@ public abstract class ProcessStep : ProcessStepBase
     public virtual ValueTask ActivateAsync(ProcessStepState state)
     {
         return default;
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ProcessStep"/> class.
+    /// </summary>
+    /// <param name="state"></param>
+    public ProcessStep(ProcessStepState? state = null)
+        : base(state ?? new())
+    {
     }
 }
 
@@ -104,5 +114,14 @@ public abstract class ProcessStep<TState> : ProcessStepBase where TState : class
     public virtual ValueTask ActivateAsync(ProcessStepState<TState> state)
     {
         return this._ActivateAsync(state);
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ProcessStep"/> class.
+    /// </summary>
+    /// <param name="state"></param>
+    public ProcessStep(ProcessStepState<TState>? state = null)
+        : base(state ?? new())
+    {
     }
 }

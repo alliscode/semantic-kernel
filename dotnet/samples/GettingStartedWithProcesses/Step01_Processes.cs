@@ -17,29 +17,32 @@ public class Step01_Processes(ITestOutputHelper output) : BaseTest(output)
     {
         ProcessBuilder process = new("ChatBot");
 
-        var introStep = process.AddStepFromType<IntroStep>();
+        ProcessStepBuilder processStepBuilder = process.AddStepFromType<IntroStep>();
+        var introStep = processStepBuilder;
         var userInputStep = process.AddStepFromType<UserInputStep>();
         var responseStep = process.AddStepFromType<ChatBotResponseStep>();
 
         // When the intro is complete, notify the userInput step
         introStep
             .OnEvent(ChatBotEvents.IntroComplete)
-            .SendEventTo(new ProcessFunctionTargetBuilder(userInputStep, nameof(UserInputStep.GetUserInputAsync)));
+            .SendEventTo(new ProcessFunctionTargetBuilder(userInputStep, "GetUserInput"));
 
         // When the userInput step emits an exit event, send it to the end step
         userInputStep
-            .OnFunctionResult(nameof(UserInputStep.GetUserInputAsync))
+            .OnFunctionResult("GetUserInput")
             .StopProcess();
 
         // When the userInput step emits a user input event, send it to the assistantResponse step
         userInputStep
             .OnEvent(ChatBotEvents.UserInputReceived)
-            .SendEventTo(new ProcessFunctionTargetBuilder(responseStep, nameof(ChatBotResponseStep.GetChatResponseAsync), "userMessage"));
+            .SendEventTo(new ProcessFunctionTargetBuilder(responseStep, "GetChatResponse", "userMessage"));
 
         // When the assistantResponse step emits a response, send it to the userInput step
         responseStep
             .OnEvent(ChatBotEvents.AssistantResponseGenerated)
-            .SendEventTo(new ProcessFunctionTargetBuilder(userInputStep, nameof(UserInputStep.GetUserInputAsync)));
+            .SendEventTo(new ProcessFunctionTargetBuilder(userInputStep, "GetUserInput"));
+
+        KernelProcess kernelProcess = process.Build();
     }
 
     public class IntroStep : ProcessStep

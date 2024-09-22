@@ -10,10 +10,13 @@ public record ProcessFunctionTarget
     /// <summary>
     /// Creates an instance of the <see cref="ProcessFunctionTarget"/> class.
     /// </summary>
-    public ProcessFunctionTarget()
+    public ProcessFunctionTarget(string stepId, string functionName, string? parameterName = null)
     {
-        Verify.NotNullOrWhiteSpace(this.StepId);
-        Verify.NotNullOrWhiteSpace(this.FunctionName);
+        Verify.NotNullOrWhiteSpace(stepId);
+        Verify.NotNullOrWhiteSpace(functionName);
+
+        this.StepId = stepId;
+        this.FunctionName = functionName;
     }
 
     /// <summary>

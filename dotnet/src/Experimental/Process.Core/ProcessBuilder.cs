@@ -76,6 +76,16 @@ public class ProcessBuilder : ProcessStepBuilder
     }
 
     /// <summary>
+    /// Builds the process.
+    /// </summary>
+    /// <returns>An instance of <see cref="KernelProcess"/></returns>
+    /// <exception cref="NotImplementedException"></exception>
+    public KernelProcess Build()
+    {
+        throw new NotImplementedException();
+    }
+
+    /// <summary>
     /// Used to resolve the target function and parameter for a given optional function name and parameter name.
     /// This is used to simplify the process of creating a <see cref="ProcessFunctionTarget"/> by making it possible
     /// to infer the function and/or parameter names from the function metadata if only one option exists.

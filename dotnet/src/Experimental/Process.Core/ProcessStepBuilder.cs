@@ -12,7 +12,7 @@ namespace Microsoft.SemanticKernel;
 public abstract class ProcessStepBuilder
 {
     /// <summary>A mapping of function names to the functions themselves.</summary>
-    private readonly Dictionary<string, KernelFunctionMetadata> _functionsDict;
+    protected Dictionary<string, KernelFunctionMetadata> FunctionsDict { get; set; }
 
     /// <summary>
     /// The unique identifier for the step.
@@ -84,19 +84,24 @@ public abstract class ProcessStepBuilder
         string? verifiedFunctionName = functionName;
         string? verifiedParameterName = parameterName;
 
+        if (this.FunctionsDict.Count == 0)
+        {
+            throw new InvalidOperationException($"The target step {this.Name} has no functions.");
+        }
+
         // If the function name is null or whitespace, then there can only one function on the step
         if (string.IsNullOrWhiteSpace(verifiedFunctionName))
         {
-            if (this._functionsDict.Count > 1)
+            if (this.FunctionsDict.Count > 1)
             {
                 throw new InvalidOperationException("The target step has more than one function, so a function name must be provided.");
             }
 
-            verifiedFunctionName = this._functionsDict.Keys.First();
+            verifiedFunctionName = this.FunctionsDict.Keys.First();
         }
 
         // Verify that the target function exists
-        if (!this._functionsDict.TryGetValue(verifiedFunctionName!, out var kernelFunctionMetadata) || kernelFunctionMetadata is null)
+        if (!this.FunctionsDict.TryGetValue(verifiedFunctionName!, out var kernelFunctionMetadata) || kernelFunctionMetadata is null)
         {
             throw new InvalidOperationException($"The function {functionName} does not exist on step {this.Name}");
         }
@@ -121,12 +126,11 @@ public abstract class ProcessStepBuilder
 
         Verify.NotNull(verifiedFunctionName);
 
-        return new ProcessFunctionTarget
-        {
-            StepId = this.Id!,
-            FunctionName = verifiedFunctionName,
-            ParameterName = verifiedParameterName
-        };
+        return new ProcessFunctionTarget(
+            stepId: this.Id!,
+            functionName: verifiedFunctionName,
+            parameterName: verifiedParameterName
+        );
     }
 
     /// <summary>
@@ -151,9 +155,9 @@ public abstract class ProcessStepBuilder
         this.Name ??= name;
         Verify.NotNullOrWhiteSpace(name);
 
+        this.FunctionsDict = [];
         this.Id = Guid.NewGuid().ToString("n");
         this.Edges = new Dictionary<string, List<ProcessStepEdgeBuilder>>(StringComparer.OrdinalIgnoreCase);
-        this._functionsDict = new Dictionary<string, KernelFunctionMetadata>(StringComparer.OrdinalIgnoreCase);
     }
 }
 
@@ -172,6 +176,7 @@ public sealed class ProcessStepBuilder<TStep> : ProcessStepBuilder where TStep :
         : base(name ?? typeof(TStep).Name)
     {
         this._eventNamespace = $"{this.Name}_{this.Id}";
+        this.FunctionsDict = this.GetFuctionMetadataMap();
     }
 
     /// <inheritdoc/>
