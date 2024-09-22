@@ -7,12 +7,12 @@ namespace Microsoft.SemanticKernel;
 /// </summary>
 public class ProcessStepEdgeBuilder
 {
-    internal ProcessStepBuilder Source { get; }
+    private ProcessStepBuilder _source { get; }
     private readonly string _eventId;
 
     internal ProcessStepEdgeBuilder(ProcessStepBuilder source, string eventType)
     {
-        this.Source = source;
+        this._source = source;
         this._eventId = eventType;
     }
 
@@ -20,12 +20,23 @@ public class ProcessStepEdgeBuilder
     /// Sends the output of the source step to the specified target when the associated event fires.
     /// </summary>
     /// <param name="outputTarget">The output target.</param>
-    public void SendOutputTo(ProcessFunctionTargetBuilder outputTarget)
+    public void SendEventTo(ProcessFunctionTargetBuilder outputTarget)
     {
-        this.Source.LinkTo(this._eventId, outputTarget);
+        this._source.LinkTo(this._eventId, outputTarget);
+    }
+
+    /// <summary>
+    /// Sends a message to stop the process.
+    /// </summary>
+    public void StopProcess()
+    {
+        this._source.LinkTo("STOP", new ProcessFunctionTargetBuilder(EndStep.Instance));
     }
 }
 
+/// <summary>
+/// Provides functionality for incrementally defining a process edge.
+/// </summary>
 public class ProcessEdgeBuilder
 {
     private readonly ProcessBuilder _source;

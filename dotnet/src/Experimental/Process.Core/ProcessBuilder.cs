@@ -70,9 +70,9 @@ public class ProcessBuilder : ProcessStepBuilder
     /// </summary>
     /// <param name="eventId">The Id of the external event.</param>
     /// <returns>An instance of <see cref="ProcessEdgeBuilder"/></returns>
-    public ProcessEdgeBuilder OnExternalEvent(string eventId)
+    public ProcessStepEdgeBuilder OnExternalEvent(string eventId)
     {
-        return new ProcessEdgeBuilder(this, eventId);
+        return new ProcessStepEdgeBuilder(this, eventId);
     }
 
     /// <summary>

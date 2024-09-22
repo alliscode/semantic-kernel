@@ -188,3 +188,32 @@ public sealed class ProcessStepBuilder<TStep> : ProcessStepBuilder where TStep :
         return functions.ToDictionary(f => f.Name, f => f.Metadata);
     }
 }
+
+/// <summary>
+/// Represents the end of a process.
+/// </summary>
+public sealed class EndStep : ProcessStepBuilder
+{
+    /// <summary>
+    /// The static instance of the <see cref="EndStep"/> class.
+    /// </summary>
+    public static EndStep Instance { get; } = new EndStep();
+
+    /// <summary>
+    /// Represents the end of a process.
+    /// </summary>
+    internal EndStep()
+        : base("END")
+    {
+    }
+
+    internal override string GetScopedEventId(string eventId)
+    {
+        return eventId;
+    }
+
+    internal override Dictionary<string, KernelFunctionMetadata> GetFuctionMetadataMap()
+    {
+        return [];
+    }
+}
