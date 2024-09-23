@@ -7,12 +7,14 @@ namespace Microsoft.SemanticKernel;
 /// </summary>
 public class ProcessStepEdgeBuilder
 {
-    private ProcessStepBuilder _source { get; }
+    private ProcessFunctionTargetBuilder? _outputTarget;
     private readonly string _eventId;
+
+    internal ProcessStepBuilder Source { get; init; }
 
     internal ProcessStepEdgeBuilder(ProcessStepBuilder source, string eventType)
     {
-        this._source = source;
+        this.Source = source;
         this._eventId = eventType;
     }
 
@@ -22,7 +24,8 @@ public class ProcessStepEdgeBuilder
     /// <param name="outputTarget">The output target.</param>
     public void SendEventTo(ProcessFunctionTargetBuilder outputTarget)
     {
-        this._source.LinkTo(this._eventId, outputTarget);
+        this._outputTarget = outputTarget;
+        this.Source.LinkTo(this._eventId, this);
     }
 
     /// <summary>
@@ -30,7 +33,17 @@ public class ProcessStepEdgeBuilder
     /// </summary>
     public void StopProcess()
     {
-        this._source.LinkTo("STOP", new ProcessFunctionTargetBuilder(EndStep.Instance));
+        var outputTarget = new ProcessFunctionTargetBuilder(EndStep.Instance);
+        this._outputTarget = outputTarget;
+        this.Source.LinkTo("STOP", this);
+    }
+
+    /// <summary>
+    /// Builds the edge.
+    /// </summary>
+    public ProcessEdge Build()
+    {
+        return new ProcessEdge(this.Source.Id, this._outputTarget.Build());
     }
 }
 
@@ -52,7 +65,7 @@ public class ProcessEdgeBuilder
     /// Sends the output of the source step to the specified target when the associated event fires.
     /// </summary>
     /// <param name="outputTarget">The output target.</param>
-    public void SendEventTo(ProcessFunctionTargetBuilder outputTarget)
+    public void SendEventTo(ProcessStepEdgeBuilder outputTarget)
     {
         this._source.LinkTo(this._eventId, outputTarget);
     }

@@ -21,7 +21,7 @@ public sealed class ProcessFunctionTargetBuilder
         // If the step is an EndStep, we don't need to resolve the function target.
         if (step is EndStep)
         {
-            this.FunctionName = string.Empty;
+            this.FunctionName = "END";
             this.ParameterName = null;
             return;
         }
@@ -31,6 +31,11 @@ public sealed class ProcessFunctionTargetBuilder
 
         this.FunctionName = target.FunctionName!;
         this.ParameterName = target.ParameterName;
+    }
+
+    public ProcessFunctionTarget Build()
+    {
+        return new ProcessFunctionTarget(this.Step.Id, this.FunctionName, this.ParameterName);
     }
 
     /// <summary>

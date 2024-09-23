@@ -138,11 +138,11 @@ public class ProcessBuilder : ProcessStepBuilder
     }
 
     /// <inheritdoc/>
-    internal override void LinkTo(string eventId, ProcessFunctionTargetBuilder functionTarget)
+    internal override void LinkTo(string eventId, ProcessStepEdgeBuilder edgeBuilder)
     {
         // Keep track of the entry point steps
-        this._entrySteps.Add(functionTarget.Step);
-        base.LinkTo(eventId, functionTarget);
+        this._entrySteps.Add(edgeBuilder.Source);
+        base.LinkTo(eventId, edgeBuilder);
     }
 
     /// <inheritdoc/>

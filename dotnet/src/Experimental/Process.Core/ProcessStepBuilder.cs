@@ -62,19 +62,16 @@ public abstract class ProcessStepBuilder
     /// Links the output of the current step to the an input of another step via the specified event type.
     /// </summary>
     /// <param name="eventId">The Id of the event.</param>
-    /// <param name="functionTarget">The targeted function.</param>
-    internal virtual void LinkTo(string eventId, ProcessFunctionTargetBuilder functionTarget)
+    /// <param name="edgeBuilder">The targeted function.</param>
+    internal virtual void LinkTo(string eventId, ProcessStepEdgeBuilder edgeBuilder)
     {
-        var outputTargets = new List<ProcessFunctionTargetBuilder> { functionTarget };
-        var edge = new ProcessStepEdgeBuilder(this, eventId);
-
         if (!this.Edges.TryGetValue(eventId, out List<ProcessStepEdgeBuilder>? edges) || edges == null)
         {
             edges = [];
             this.Edges[eventId] = edges;
         }
 
-        edges.Add(edge);
+        edges.Add(edgeBuilder);
     }
 
     /// <summary>
@@ -203,12 +200,12 @@ public sealed class ProcessStepBuilder<TStep> : ProcessStepBuilder where TStep :
             var state = (ProcessStepState?)Activator.CreateInstance(stateType);
             Verify.NotNull(state);
 
-            return new ProcessStepBase(state);
+            return new ProcessStepBase(state, this.Edges.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Select(e => e.Build()).ToList()));
         }
         else
         {
             var state = new ProcessStepState();
-            return new ProcessStepBase(state);
+            return new ProcessStepBase(state, this.Edges.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Select(e => e.Build()).ToList()));
         }
     }
 
@@ -275,6 +272,6 @@ public sealed class EndStep : ProcessStepBuilder
 
     internal override ProcessStepBase BuildStep()
     {
-        return new ProcessStepBase(new ProcessStepState());
+        return new ProcessStepBase(new ProcessStepState(), []);
     }
 }

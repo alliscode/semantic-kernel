@@ -15,7 +15,7 @@ public class ProcessStepBase
     /// <summary>
     /// A mapping of output edges from the Step using the .
     /// </summary>
-    private readonly Dictionary<string, List<ProcessEdge>> _outputEdges = new();
+    private readonly Dictionary<string, List<ProcessEdge>> _outputEdges;
 
     /// <summary>
     /// The state object of type TState.
@@ -55,11 +55,12 @@ public class ProcessStepBase
     /// <summary>
     /// Initializes a new instance of the <see cref="ProcessStepBase"/> class.
     /// </summary>
-    public ProcessStepBase(ProcessStepState state)
+    public ProcessStepBase(ProcessStepState state, Dictionary<string, List<ProcessEdge>> edges)
     {
         Verify.NotNull(state);
+        Verify.NotNull(edges);
         this.State = state;
-        this._outputEdges = [];
+        this._outputEdges = edges;
     }
 }
 
@@ -84,9 +85,10 @@ public class ProcessStep : ProcessStepBase
     /// <summary>
     /// Initializes a new instance of the <see cref="ProcessStep"/> class.
     /// </summary>
+    /// <param name="edges">The output edges.</param>
     /// <param name="state"></param>
-    protected ProcessStep(ProcessStepState? state = null)
-        : base(state ?? new())
+    protected ProcessStep(ProcessStepState? state = null, Dictionary<string, List<ProcessEdge>>? edges = null)
+        : base(state ?? new(), edges ?? [])
     {
     }
 }
@@ -124,8 +126,8 @@ public class ProcessStep<TState> : ProcessStepBase where TState : class, new()
     /// Initializes a new instance of the <see cref="ProcessStep"/> class.
     /// </summary>
     /// <param name="state">The state associated with this step.</param>
-    public ProcessStep(ProcessStepState<TState>? state = null)
-        : base(state ?? new())
+    public ProcessStep(ProcessStepState<TState>? state = null, Dictionary<string, List<ProcessEdge>>? edges = null)
+        : base(state ?? new(), edges ?? [])
     {
     }
 }

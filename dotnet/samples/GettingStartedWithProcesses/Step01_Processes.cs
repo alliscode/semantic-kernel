@@ -16,9 +16,7 @@ public class Step01_Processes(ITestOutputHelper output) : BaseTest(output)
     public async Task UseSimpleProcessAsync()
     {
         ProcessBuilder process = new("ChatBot");
-
-        ProcessStepBuilder processStepBuilder = process.AddStepFromType<IntroStep>();
-        var introStep = processStepBuilder;
+        var introStep = process.AddStepFromType<IntroStep>();
         var userInputStep = process.AddStepFromType<UserInputStep>();
         var responseStep = process.AddStepFromType<ChatBotResponseStep>();
 
