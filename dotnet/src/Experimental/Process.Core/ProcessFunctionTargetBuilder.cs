@@ -33,9 +33,9 @@ public sealed class ProcessFunctionTargetBuilder
         this.ParameterName = target.ParameterName;
     }
 
-    public ProcessFunctionTarget Build()
+    public KernelProcessFunctionTarget Build()
     {
-        return new ProcessFunctionTarget(this.Step.Id, this.FunctionName, this.ParameterName);
+        return new KernelProcessFunctionTarget(this.Step.Id, this.FunctionName, this.ParameterName);
     }
 
     /// <summary>

@@ -5,7 +5,8 @@ namespace Microsoft.SemanticKernel;
 /// <summary>
 /// Represents the state of an individual step in a process.
 /// </summary>
-public class ProcessStepState
+public class KernelProcessStepState
+
 {
     /// <summary>
     /// The identifier of the Step which is required to be unique within an instance of a Process.
@@ -21,10 +22,10 @@ public class ProcessStepState
 }
 
 /// <summary>
-/// Represents the state of an individual step in a process.
+/// Represents the state of an individual step in a process that includes a user-defined state object.
 /// </summary>
 /// <typeparam name="TState">The type of the user-defined state.</typeparam>
-public sealed class ProcessStepState<TState> : ProcessStepState where TState : class, new()
+public sealed class ProcessStepState<TState> : KernelProcessStepState where TState : class, new()
 {
     /// <summary>
     /// The user-defined state object associated with the Step.

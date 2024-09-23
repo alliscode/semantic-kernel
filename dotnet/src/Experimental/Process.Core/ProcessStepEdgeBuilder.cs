@@ -41,9 +41,9 @@ public class ProcessStepEdgeBuilder
     /// <summary>
     /// Builds the edge.
     /// </summary>
-    public ProcessEdge Build()
+    public KernelProcessEdge Build()
     {
-        return new ProcessEdge(this.Source.Id, this._outputTarget.Build());
+        return new KernelProcessEdge(this.Source.Id, this._outputTarget.Build());
     }
 }
 

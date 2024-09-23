@@ -1,6 +1,5 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -10,17 +9,17 @@ namespace Microsoft.SemanticKernel;
 /// <summary>
 /// Base implementation of a Step in a Process.
 /// </summary>
-public class ProcessStepBase
+public class KernelProcessStepBase
 {
     /// <summary>
     /// A mapping of output edges from the Step using the .
     /// </summary>
-    private readonly Dictionary<string, List<ProcessEdge>> _outputEdges;
+    private readonly Dictionary<string, List<KernelProcessEdge>> _outputEdges;
 
     /// <summary>
     /// The state object of type TState.
     /// </summary>
-    internal ProcessStepState State { get; init; }
+    internal KernelProcessStepState State { get; init; }
 
     /// <summary>
     /// A read-only collection of event Ids that this Step can emit.
@@ -31,15 +30,15 @@ public class ProcessStepBase
     /// Retrieves the output edges for a given event Id. Returns an empty list if the event Id is not found.
     /// </summary>
     /// <param name="eventId">The Id of an event.</param>
-    /// <returns></returns>
-    protected IReadOnlyCollection<ProcessEdge> GetOutputEdges(string eventId)
+    /// <returns>An <see cref="IReadOnlyCollection{T}"/> where T is <see cref="KernelProcessEdge"/></returns>
+    protected IReadOnlyCollection<KernelProcessEdge> GetOutputEdges(string eventId)
     {
-        if (this._outputEdges.TryGetValue(eventId, out List<ProcessEdge>? edges))
+        if (this._outputEdges.TryGetValue(eventId, out List<KernelProcessEdge>? edges))
         {
             return edges.AsReadOnly();
         }
 
-        return new List<ProcessEdge>().AsReadOnly();
+        return new List<KernelProcessEdge>().AsReadOnly();
     }
 
     /// <summary>
@@ -47,18 +46,19 @@ public class ProcessStepBase
     /// </summary>
     /// <param name="state">An instance of the state that holds state data for the step.</param>
     /// <returns>An instance of <see cref="ValueTask"/></returns>
-    internal virtual ValueTask _ActivateAsync(ProcessStepState state)
+    internal virtual ValueTask _ActivateAsync(KernelProcessStepState state)
     {
         return default;
     }
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="ProcessStepBase"/> class.
+    /// Initializes a new instance of the <see cref="KernelProcessStepBase"/> class.
     /// </summary>
-    public ProcessStepBase(ProcessStepState state, Dictionary<string, List<ProcessEdge>> edges)
+    public KernelProcessStepBase(KernelProcessStepState state, Dictionary<string, List<KernelProcessEdge>> edges)
     {
         Verify.NotNull(state);
         Verify.NotNull(edges);
+
         this.State = state;
         this._outputEdges = edges;
     }
@@ -67,27 +67,27 @@ public class ProcessStepBase
 /// <summary>
 /// Process Step. Derive from this class to create a new Step for a Process.
 /// </summary>
-public class ProcessStep : ProcessStepBase
+public class KernelProcessStep : KernelProcessStepBase
 {
     /// <inheritdoc/>
-    internal override ValueTask _ActivateAsync(ProcessStepState state)
+    internal override ValueTask _ActivateAsync(KernelProcessStepState state)
     {
         Verify.NotNull(state);
         return this.ActivateAsync(state);
     }
 
     /// <inheritdoc/>
-    public virtual ValueTask ActivateAsync(ProcessStepState state)
+    public virtual ValueTask ActivateAsync(KernelProcessStepState state)
     {
         return default;
     }
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="ProcessStep"/> class.
+    /// Initializes a new instance of the <see cref="KernelProcessStep"/> class.
     /// </summary>
+    /// <param name="state">An instance that derives from <see cref="KernelProcessStepState"/></param>
     /// <param name="edges">The output edges.</param>
-    /// <param name="state"></param>
-    protected ProcessStep(ProcessStepState? state = null, Dictionary<string, List<ProcessEdge>>? edges = null)
+    protected KernelProcessStep(KernelProcessStepState? state = null, Dictionary<string, List<KernelProcessEdge>>? edges = null)
         : base(state ?? new(), edges ?? [])
     {
     }
@@ -97,12 +97,12 @@ public class ProcessStep : ProcessStepBase
 /// Process Step. Derive from this class to create a new Step with user-defined state of type TState for a Process.
 /// </summary>
 /// <typeparam name="TState">An instance of TState used for user-defined state.</typeparam>
-public class ProcessStep<TState> : ProcessStepBase where TState : class, new()
+public class KernelProcessStep<TState> : KernelProcessStepBase where TState : class, new()
 {
     internal new ProcessStepState<TState> State => base.State as ProcessStepState<TState> ?? new();
 
     /// <inheritdoc/>
-    internal override ValueTask _ActivateAsync(ProcessStepState state)
+    internal override ValueTask _ActivateAsync(KernelProcessStepState state)
     {
         var genericState = state as ProcessStepState<TState>;
         Verify.NotNull(genericState);
@@ -123,10 +123,11 @@ public class ProcessStep<TState> : ProcessStepBase where TState : class, new()
     }
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="ProcessStep"/> class.
+    /// Initializes a new instance of the <see cref="KernelProcessStep"/> class.
     /// </summary>
     /// <param name="state">The state associated with this step.</param>
-    public ProcessStep(ProcessStepState<TState>? state = null, Dictionary<string, List<ProcessEdge>>? edges = null)
+    /// <param name="edges">The output edges.</param>
+    public KernelProcessStep(ProcessStepState<TState>? state = null, Dictionary<string, List<KernelProcessEdge>>? edges = null)
         : base(state ?? new(), edges ?? [])
     {
     }

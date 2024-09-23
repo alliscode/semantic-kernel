@@ -5,12 +5,12 @@ namespace Microsoft.SemanticKernel;
 /// <summary>
 /// A serializable representation of a specic parameter of a specific function of a specific Step.
 /// </summary>
-public record ProcessFunctionTarget
+public record KernelProcessFunctionTarget
 {
     /// <summary>
-    /// Creates an instance of the <see cref="ProcessFunctionTarget"/> class.
+    /// Creates an instance of the <see cref="KernelProcessFunctionTarget"/> class.
     /// </summary>
-    public ProcessFunctionTarget(string stepId, string functionName, string? parameterName = null)
+    public KernelProcessFunctionTarget(string stepId, string functionName, string? parameterName = null)
     {
         Verify.NotNullOrWhiteSpace(stepId);
         Verify.NotNullOrWhiteSpace(functionName);

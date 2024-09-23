@@ -5,6 +5,6 @@ namespace Microsoft.SemanticKernel;
 /// <summary>
 /// Represents the state of a process.
 /// </summary>
-public sealed class ProcessState : ProcessStepState
+public sealed class KernelProcessState : KernelProcessStepState
 {
 }

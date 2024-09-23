@@ -7,25 +7,25 @@ namespace Microsoft.SemanticKernel;
 /// <summary>
 /// A serializable representation of a Process.
 /// </summary>
-public class KernelProcess : ProcessStep<ProcessState>
+public sealed class KernelProcess : KernelProcessStep<KernelProcessState>
 {
     /// <summary>
     /// The collection of Steps in the Process.
     /// </summary>
-    public IList<ProcessStepBase> Steps { get; init; }
+    public IList<KernelProcessStepBase> Steps { get; init; }
 
     /// <summary>
     /// Creates a new instance of the <see cref="KernelProcess"/> class.
     /// </summary>
     /// <param name="name">The human friendly name of the Process.</param>
     /// <param name="steps">The steps of the process.</param>
-    public KernelProcess(string name, IList<ProcessStepBase> steps)
+    public KernelProcess(string name, IList<KernelProcessStepBase> steps)
     {
         Verify.NotNull(steps);
         Verify.NotNullOrWhiteSpace(name);
 
         this.Steps = steps;
-        this.State.State = new ProcessState
+        this.State.State = new KernelProcessState
         {
             Name = name
         };

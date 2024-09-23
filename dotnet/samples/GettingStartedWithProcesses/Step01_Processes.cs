@@ -25,7 +25,7 @@ public class Step01_Processes(ITestOutputHelper output) : BaseTest(output)
             .OnEvent(ChatBotEvents.IntroComplete)
             .SendEventTo(new ProcessFunctionTargetBuilder(userInputStep, "GetUserInput"));
 
-        // When the userInput step emits an exit event, send it to the end step
+        // When the userInput step emits an exit event, send it to the end steprt
         userInputStep
             .OnFunctionResult("GetUserInput")
             .StopProcess();
@@ -43,7 +43,7 @@ public class Step01_Processes(ITestOutputHelper output) : BaseTest(output)
         KernelProcess kernelProcess = process.Build();
     }
 
-    public class IntroStep : ProcessStep
+    public class IntroStep : KernelProcessStep
     {
         [KernelFunction()]
         public void PrintIntroMessage()
@@ -51,7 +51,7 @@ public class Step01_Processes(ITestOutputHelper output) : BaseTest(output)
         }
     }
 
-    public class UserInputStep : ProcessStep<UserInputState>
+    public class UserInputStep : KernelProcessStep<UserInputState>
     {
         private UserInputState? _state;
 
@@ -68,7 +68,7 @@ public class Step01_Processes(ITestOutputHelper output) : BaseTest(output)
         }
 
         [KernelFunction("GetUserInput")]
-        public async ValueTask GetUserInputAsync(ProcessStepContext context)
+        public async ValueTask GetUserInputAsync(KernelProcessStepContext context)
         {
             var input = _state!.UserInputs[_state.CurrentInputIndex];
             _state.CurrentInputIndex++;
@@ -85,7 +85,7 @@ public class Step01_Processes(ITestOutputHelper output) : BaseTest(output)
         }
     }
 
-    public class ChatBotResponseStep : ProcessStep<ChatBotState>
+    public class ChatBotResponseStep : KernelProcessStep<ChatBotState>
     {
         internal ChatBotState? _state;
 
@@ -97,7 +97,7 @@ public class Step01_Processes(ITestOutputHelper output) : BaseTest(output)
         }
 
         [KernelFunction("GetChatResponse")]
-        public async Task GetChatResponseAsync(ProcessStepContext context, string userMessage, Kernel _kernel)
+        public async Task GetChatResponseAsync(KernelProcessStepContext context, string userMessage, Kernel _kernel)
         {
             _state!.ChatMessages.Add(new(AuthorRole.User, userMessage));
             IChatCompletionService chatService = _kernel.Services.GetRequiredService<IChatCompletionService>();
@@ -108,7 +108,7 @@ public class Step01_Processes(ITestOutputHelper output) : BaseTest(output)
             }
 
             // emit event: assistantResponse
-            await context.EmitEventAsync(new ProcessEvent { Id = ChatBotEvents.AssistantResponseGenerated, Data = response });
+            await context.EmitEventAsync(new KernelProcessEvent { Id = ChatBotEvents.AssistantResponseGenerated, Data = response });
         }
     }
 

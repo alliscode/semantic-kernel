@@ -3,9 +3,9 @@
 namespace Microsoft.SemanticKernel;
 
 /// <summary>
-/// An abstract class representing an event that can be emitted from a <see cref="ProcessStep"/>.
+/// An class representing an event that can be emitted from a <see cref="KernelProcessStep"/>. This type is convertable to and from CloudEvents.
 /// </summary>
-public class ProcessEvent
+public class KernelProcessEvent
 {
     /// <summary>
     /// The unique identifier for the event.

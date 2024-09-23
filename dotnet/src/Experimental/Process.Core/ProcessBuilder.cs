@@ -38,7 +38,7 @@ public class ProcessBuilder : ProcessStepBuilder
     /// <typeparam name="TStep">The step Type.</typeparam>
     /// <param name="name">The name of the step. This parameter is optional.</param>
     /// <returns>An instance of <see cref="ProcessStepBuilder"/></returns>
-    public ProcessStepBuilder AddStepFromType<TStep>(string? name = null) where TStep : ProcessStepBase
+    public ProcessStepBuilder AddStepFromType<TStep>(string? name = null) where TStep : KernelProcessStepBase
     {
         var stepBuilder = new ProcessStepBuilder<TStep>(name);
         this._steps.Add(stepBuilder);
@@ -94,24 +94,24 @@ public class ProcessBuilder : ProcessStepBuilder
         }
     }
 
-    internal override ProcessStepBase BuildStep()
+    internal override KernelProcessStepBase BuildStep()
     {
         return this.Build();
     }
 
     /// <summary>
     /// Used to resolve the target function and parameter for a given optional function name and parameter name.
-    /// This is used to simplify the process of creating a <see cref="ProcessFunctionTarget"/> by making it possible
+    /// This is used to simplify the process of creating a <see cref="KernelProcessFunctionTarget"/> by making it possible
     /// to infer the function and/or parameter names from the function metadata if only one option exists.
     /// </summary>
     /// <param name="functionName">The name of the function. May be null if only one function exists on the step.</param>
     /// <param name="parameterName">The name of the parameter. May be null if only one parameter exists on the function.</param>
-    /// <returns>A valid instance of <see cref="ProcessFunctionTarget"/> for this step.</returns>
+    /// <returns>A valid instance of <see cref="KernelProcessFunctionTarget"/> for this step.</returns>
     /// <exception cref="InvalidOperationException"></exception>
-    internal override ProcessFunctionTarget ResolveFunctionTarget(string? functionName, string? parameterName)
+    internal override KernelProcessFunctionTarget ResolveFunctionTarget(string? functionName, string? parameterName)
     {
         // Try to resolve the function target on each of the registered entry points.
-        var targets = new List<ProcessFunctionTarget>();
+        var targets = new List<KernelProcessFunctionTarget>();
         foreach (var step in this._entrySteps)
         {
             try

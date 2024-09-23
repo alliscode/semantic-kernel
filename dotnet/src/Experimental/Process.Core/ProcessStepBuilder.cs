@@ -55,8 +55,8 @@ public abstract class ProcessStepBuilder
     /// <summary>
     /// Builds the step.
     /// </summary>
-    /// <returns>an instance of <see cref="ProcessStep"/>.</returns>
-    internal abstract ProcessStepBase BuildStep();
+    /// <returns>an instance of <see cref="KernelProcessStep"/>.</returns>
+    internal abstract KernelProcessStepBase BuildStep();
 
     /// <summary>
     /// Links the output of the current step to the an input of another step via the specified event type.
@@ -76,14 +76,14 @@ public abstract class ProcessStepBuilder
 
     /// <summary>
     /// Used to resolve the target function and parameter for a given optional function name and parameter name.
-    /// This is used to simplify the process of creating a <see cref="ProcessFunctionTarget"/> by making it possible
+    /// This is used to simplify the process of creating a <see cref="KernelProcessFunctionTarget"/> by making it possible
     /// to infer the function and/or parameter names from the function metadata if only one option exists.
     /// </summary>
     /// <param name="functionName">The name of the function. May be null if only one function exists on the step.</param>
     /// <param name="parameterName">The name of the parameter. May be null if only one parameter exists on the function.</param>
-    /// <returns>A valid instance of <see cref="ProcessFunctionTarget"/> for this step.</returns>
+    /// <returns>A valid instance of <see cref="KernelProcessFunctionTarget"/> for this step.</returns>
     /// <exception cref="InvalidOperationException"></exception>
-    internal virtual ProcessFunctionTarget ResolveFunctionTarget(string? functionName, string? parameterName)
+    internal virtual KernelProcessFunctionTarget ResolveFunctionTarget(string? functionName, string? parameterName)
     {
         string? verifiedFunctionName = functionName;
         string? verifiedParameterName = parameterName;
@@ -113,7 +113,7 @@ public abstract class ProcessStepBuilder
         // If the parameter name is null or whitespace, then the function must have 0 or 1 parameters
         if (string.IsNullOrWhiteSpace(verifiedParameterName))
         {
-            var undeterminedParameters = kernelFunctionMetadata.Parameters.Where(p => p.ParameterType != typeof(ProcessStepContext)).ToList();
+            var undeterminedParameters = kernelFunctionMetadata.Parameters.Where(p => p.ParameterType != typeof(KernelProcessStepContext)).ToList();
 
             if (undeterminedParameters.Count > 1)
             {
@@ -130,7 +130,7 @@ public abstract class ProcessStepBuilder
 
         Verify.NotNull(verifiedFunctionName);
 
-        return new ProcessFunctionTarget(
+        return new KernelProcessFunctionTarget(
             stepId: this.Id!,
             functionName: verifiedFunctionName,
             parameterName: verifiedParameterName
@@ -168,7 +168,7 @@ public abstract class ProcessStepBuilder
 /// <summary>
 /// Provides functionality for incrementally defining a process step.
 /// </summary>
-public sealed class ProcessStepBuilder<TStep> : ProcessStepBuilder where TStep : ProcessStepBase
+public sealed class ProcessStepBuilder<TStep> : ProcessStepBuilder where TStep : KernelProcessStepBase
 {
     /// <summary>The namespace for events that are scoped to this step.</summary>
     private readonly string _eventNamespace;
@@ -187,7 +187,7 @@ public sealed class ProcessStepBuilder<TStep> : ProcessStepBuilder where TStep :
     /// Builds the step.
     /// </summary>
     /// <returns></returns>
-    internal override ProcessStepBase BuildStep()
+    internal override KernelProcessStepBase BuildStep()
     {
         if (TryGetSubtypeOfStatefulStep(typeof(TStep), out Type? genericStepType) && genericStepType is not null)
         {
@@ -197,21 +197,21 @@ public sealed class ProcessStepBuilder<TStep> : ProcessStepBuilder where TStep :
             var stateType = typeof(ProcessStepState<>).MakeGenericType(userStateType);
             Verify.NotNull(stateType);
 
-            var state = (ProcessStepState?)Activator.CreateInstance(stateType);
+            var state = (KernelProcessStepState?)Activator.CreateInstance(stateType);
             Verify.NotNull(state);
 
-            return new ProcessStepBase(state, this.Edges.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Select(e => e.Build()).ToList()));
+            return new KernelProcessStepBase(state, this.Edges.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Select(e => e.Build()).ToList()));
         }
         else
         {
-            var state = new ProcessStepState();
-            return new ProcessStepBase(state, this.Edges.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Select(e => e.Build()).ToList()));
+            var state = new KernelProcessStepState();
+            return new KernelProcessStepBase(state, this.Edges.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Select(e => e.Build()).ToList()));
         }
     }
 
     private static bool TryGetSubtypeOfStatefulStep(Type? type, out Type? genericStateType)
     {
-        var genericType = typeof(ProcessStep<>);
+        var genericType = typeof(KernelProcessStep<>);
         while (type != null && type != typeof(object))
         {
             if (type.IsGenericType && type.GetGenericTypeDefinition() == genericType)
@@ -270,8 +270,8 @@ public sealed class EndStep : ProcessStepBuilder
         return [];
     }
 
-    internal override ProcessStepBase BuildStep()
+    internal override KernelProcessStepBase BuildStep()
     {
-        return new ProcessStepBase(new ProcessStepState(), []);
+        return new KernelProcessStepBase(new KernelProcessStepState(), []);
     }
 }
