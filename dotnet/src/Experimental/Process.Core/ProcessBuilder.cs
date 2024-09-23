@@ -82,7 +82,21 @@ public class ProcessBuilder : ProcessStepBuilder
     /// <exception cref="NotImplementedException"></exception>
     public KernelProcess Build()
     {
-        throw new NotImplementedException();
+        try
+        {
+            var process = new KernelProcess(this.Name, this._steps.Select(step => step.BuildStep()).ToList());
+            return process;
+        }
+        catch (Exception)
+        {
+
+            throw;
+        }
+    }
+
+    internal override ProcessStepBase BuildStep()
+    {
+        return this.Build();
     }
 
     /// <summary>

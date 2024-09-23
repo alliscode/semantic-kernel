@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 
 namespace Microsoft.SemanticKernel;
@@ -50,6 +51,12 @@ public abstract class ProcessStepBuilder
     {
         return this.OnEvent($"{functionName}.OnResult");
     }
+
+    /// <summary>
+    /// Builds the step.
+    /// </summary>
+    /// <returns>an instance of <see cref="ProcessStep"/>.</returns>
+    internal abstract ProcessStepBase BuildStep();
 
     /// <summary>
     /// Links the output of the current step to the an input of another step via the specified event type.
@@ -179,6 +186,50 @@ public sealed class ProcessStepBuilder<TStep> : ProcessStepBuilder where TStep :
         this.FunctionsDict = this.GetFuctionMetadataMap();
     }
 
+    /// <summary>
+    /// Builds the step.
+    /// </summary>
+    /// <returns></returns>
+    internal override ProcessStepBase BuildStep()
+    {
+        if (TryGetSubtypeOfStatefulStep(typeof(TStep), out Type? genericStepType) && genericStepType is not null)
+        {
+            var userStateType = genericStepType.GetGenericArguments()[0];
+            Verify.NotNull(userStateType);
+
+            var stateType = typeof(ProcessStepState<>).MakeGenericType(userStateType);
+            Verify.NotNull(stateType);
+
+            var state = (ProcessStepState?)Activator.CreateInstance(stateType);
+            Verify.NotNull(state);
+
+            return new ProcessStepBase(state);
+        }
+        else
+        {
+            var state = new ProcessStepState();
+            return new ProcessStepBase(state);
+        }
+    }
+
+    private static bool TryGetSubtypeOfStatefulStep(Type? type, out Type? genericStateType)
+    {
+        var genericType = typeof(ProcessStep<>);
+        while (type != null && type != typeof(object))
+        {
+            if (type.IsGenericType && type.GetGenericTypeDefinition() == genericType)
+            {
+                genericStateType = type;
+                return true;
+            }
+
+            type = type.BaseType;
+        }
+
+        genericStateType = null;
+        return false;
+    }
+
     /// <inheritdoc/>
     internal override string GetScopedEventId(string eventId)
     {
@@ -220,5 +271,10 @@ public sealed class EndStep : ProcessStepBuilder
     internal override Dictionary<string, KernelFunctionMetadata> GetFuctionMetadataMap()
     {
         return [];
+    }
+
+    internal override ProcessStepBase BuildStep()
+    {
+        return new ProcessStepBase(new ProcessStepState());
     }
 }
