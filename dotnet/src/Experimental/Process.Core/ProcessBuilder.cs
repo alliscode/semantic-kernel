@@ -38,7 +38,7 @@ public class ProcessBuilder : ProcessStepBuilder
     /// <typeparam name="TStep">The step Type.</typeparam>
     /// <param name="name">The name of the step. This parameter is optional.</param>
     /// <returns>An instance of <see cref="ProcessStepBuilder"/></returns>
-    public ProcessStepBuilder AddStepFromType<TStep>(string? name = null) where TStep : KernelProcessStepBase
+    public ProcessStepBuilder AddStepFromType<TStep>(string? name = null) where TStep : KernelProcessStep
     {
         var stepBuilder = new ProcessStepBuilder<TStep>(name);
         this._steps.Add(stepBuilder);
@@ -82,19 +82,11 @@ public class ProcessBuilder : ProcessStepBuilder
     /// <exception cref="NotImplementedException"></exception>
     public KernelProcess Build()
     {
-        try
-        {
-            var process = new KernelProcess(this.Name, this._steps.Select(step => step.BuildStep()).ToList());
-            return process;
-        }
-        catch (Exception)
-        {
-
-            throw;
-        }
+        var process = new KernelProcess(this.Name, this._steps.Select(step => step.BuildStep()).ToList());
+        return process;
     }
 
-    internal override KernelProcessStepBase BuildStep()
+    internal override KernelProcessStepInfo BuildStep()
     {
         return this.Build();
     }

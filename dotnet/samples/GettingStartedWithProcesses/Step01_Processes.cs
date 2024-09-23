@@ -55,7 +55,7 @@ public class Step01_Processes(ITestOutputHelper output) : BaseTest(output)
     {
         private UserInputState? _state;
 
-        public override ValueTask ActivateAsync(ProcessStepState<UserInputState> state)
+        public override ValueTask ActivateAsync(KernelProcessStepState<UserInputState> state)
         {
             state.State ??= new();
             _state = state.State;
@@ -89,7 +89,7 @@ public class Step01_Processes(ITestOutputHelper output) : BaseTest(output)
     {
         internal ChatBotState? _state;
 
-        public override ValueTask ActivateAsync(ProcessStepState<ChatBotState> state)
+        public override ValueTask ActivateAsync(KernelProcessStepState<ChatBotState> state)
         {
             _state = state.State ?? new();
             _state.ChatMessages ??= new();

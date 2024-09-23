@@ -2,7 +2,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 
 namespace Microsoft.SemanticKernel;
@@ -56,7 +55,7 @@ public abstract class ProcessStepBuilder
     /// Builds the step.
     /// </summary>
     /// <returns>an instance of <see cref="KernelProcessStep"/>.</returns>
-    internal abstract KernelProcessStepBase BuildStep();
+    internal abstract KernelProcessStepInfo BuildStep();
 
     /// <summary>
     /// Links the output of the current step to the an input of another step via the specified event type.
@@ -168,7 +167,7 @@ public abstract class ProcessStepBuilder
 /// <summary>
 /// Provides functionality for incrementally defining a process step.
 /// </summary>
-public sealed class ProcessStepBuilder<TStep> : ProcessStepBuilder where TStep : KernelProcessStepBase
+public sealed class ProcessStepBuilder<TStep> : ProcessStepBuilder where TStep : KernelProcessStep
 {
     /// <summary>The namespace for events that are scoped to this step.</summary>
     private readonly string _eventNamespace;
@@ -186,26 +185,26 @@ public sealed class ProcessStepBuilder<TStep> : ProcessStepBuilder where TStep :
     /// <summary>
     /// Builds the step.
     /// </summary>
-    /// <returns></returns>
-    internal override KernelProcessStepBase BuildStep()
+    /// <returns>An instance of <see cref="KernelProcessStepInfo"/></returns>
+    internal override KernelProcessStepInfo BuildStep()
     {
         if (TryGetSubtypeOfStatefulStep(typeof(TStep), out Type? genericStepType) && genericStepType is not null)
         {
             var userStateType = genericStepType.GetGenericArguments()[0];
             Verify.NotNull(userStateType);
 
-            var stateType = typeof(ProcessStepState<>).MakeGenericType(userStateType);
+            var stateType = typeof(KernelProcessStepState<>).MakeGenericType(userStateType);
             Verify.NotNull(stateType);
 
-            var state = (KernelProcessStepState?)Activator.CreateInstance(stateType);
+            var state = (KernelProcessStepState?)Activator.CreateInstance(stateType, this.Id, this.Name);
             Verify.NotNull(state);
 
-            return new KernelProcessStepBase(state, this.Edges.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Select(e => e.Build()).ToList()));
+            return new KernelProcessStepInfo(typeof(TStep), state, this.Edges.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Select(e => e.Build()).ToList()));
         }
         else
         {
-            var state = new KernelProcessStepState();
-            return new KernelProcessStepBase(state, this.Edges.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Select(e => e.Build()).ToList()));
+            var state = new KernelProcessStepState(this.Id, this.Name);
+            return new KernelProcessStepInfo(typeof(TStep), state, this.Edges.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Select(e => e.Build()).ToList()));
         }
     }
 
@@ -270,8 +269,8 @@ public sealed class EndStep : ProcessStepBuilder
         return [];
     }
 
-    internal override KernelProcessStepBase BuildStep()
+    internal override KernelProcessStepInfo BuildStep()
     {
-        return new KernelProcessStepBase(new KernelProcessStepState(), []);
+        return new KernelProcessStepInfo(typeof(KernelProcessStepState), new KernelProcessStepState(), []);
     }
 }
