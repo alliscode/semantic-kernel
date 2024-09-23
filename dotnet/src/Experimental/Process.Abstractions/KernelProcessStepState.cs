@@ -22,7 +22,7 @@ public class KernelProcessStepState
     /// <summary>
     /// Initializes a new instance of the <see cref="KernelProcessStepState"/> class.
     /// </summary>
-    /// <param name="id">The Id of the associated <see cref="KernelProcessStep"/><</param>
+    /// <param name="id">The Id of the associated <see cref="KernelProcessStep"/></param>
     /// <param name="name">The name of the associated <see cref="KernelProcessStep"/></param>
     public KernelProcessStepState(string? id = null, string? name = null)
     {
@@ -45,7 +45,7 @@ public sealed class KernelProcessStepState<TState> : KernelProcessStepState wher
     /// <summary>
     /// Initializes a new instance of the <see cref="KernelProcessStepState"/> class.
     /// </summary>
-    /// <param name="id">The Id of the associated <see cref="KernelProcessStep"/><</param>
+    /// <param name="id">The Id of the associated <see cref="KernelProcessStep"/></param>
     /// <param name="name">The name of the associated <see cref="KernelProcessStep"/></param>
     public KernelProcessStepState(string? id = null, string? name = null)
     {
