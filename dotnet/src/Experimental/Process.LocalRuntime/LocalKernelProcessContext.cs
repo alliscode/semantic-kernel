@@ -1,6 +1,5 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
-using System;
 using System.Threading.Tasks;
 
 namespace Microsoft.SemanticKernel.Process;
@@ -12,49 +11,27 @@ public class LocalKernelProcessContext
 {
     private readonly string _processId;
     private readonly LocalProcess _localProcess;
-    private Task _processTask;
+    private Task? _processTask;
+    private readonly Kernel _kernel;
 
-    internal LocalKernelProcessContext(KernelProcess process)
+    internal LocalKernelProcessContext(KernelProcess process, Kernel kernel)
     {
         Verify.NotNull(process);
         Verify.NotNullOrWhiteSpace(process.State?.Name);
+        Verify.NotNull(kernel);
 
+        this._kernel = kernel;
         this._localProcess = new LocalProcess(
             process,
-            kernel: new Kernel(),
+            kernel: kernel,
             parentProcessId: null,
             loggerFactory: null);
 
         this._processId = this._localProcess.Id;
     }
 
-    internal LocalKernelProcessContext(string processId)
-    {
-        Verify.NotNull(processId);
-        // TODO: Get process by Id
-    }
-
-    internal void Start(Kernel kernel, KernelProcessEvent initialEvent)
+    internal void Start(KernelProcessEvent initialEvent, Kernel? kernel = null)
     {
         this._processTask = this._localProcess.ExecuteAsync(kernel, initialEvent, 100);
-    }
-
-    /// <summary>
-    /// Stops the running process.
-    /// </summary>
-    public ValueTask StopAsync()
-    {
-        return default;
-    }
-
-    /// <summary>
-    /// Sends an event to the running process.
-    /// </summary>
-    /// <param name="eventId">The unique Id of the event.</param>
-    /// <param name="eventData">An optional data object to send with the event.</param>
-    /// <returns></returns>
-    public ValueTask SendEventAsync(string eventId, object? eventData)
-    {
-        return default;
     }
 }

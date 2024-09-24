@@ -35,8 +35,9 @@ internal sealed class LocalProcess : LocalStep
         this._process = process;
     }
 
-    public async Task ExecuteAsync(Kernel kernel, KernelProcessEvent? initialEvent = null, int maxSupersteps = 100)
+    public async Task ExecuteAsync(Kernel? kernel = null, KernelProcessEvent? initialEvent = null, int maxSupersteps = 100)
     {
+        Kernel localKernel = kernel ?? this._kernel;
         CancellationTokenSource cancelSource = new();
         Queue<LocalMessage> messageChannel = new();
 
@@ -60,7 +61,7 @@ internal sealed class LocalProcess : LocalStep
 
                 var process = new LocalProcess(
                     process: kernelStep,
-                    kernel: this._kernel,
+                    kernel: localKernel,
                     parentProcessId: this.Id,
                     loggerFactory: this.LoggerFactory);
 
@@ -74,7 +75,7 @@ internal sealed class LocalProcess : LocalStep
                 localStep = new LocalStep(
                     name: step.State.Name,
                     id: step.State.Id,
-                    kernel: this._kernel,
+                    kernel: localKernel,
                     parentProcessId: this.Id,
                     loggerFactory: this.LoggerFactory);
             }
