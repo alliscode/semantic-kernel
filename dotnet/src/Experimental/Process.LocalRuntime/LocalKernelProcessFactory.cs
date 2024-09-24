@@ -15,13 +15,20 @@ public static class LocalKernelProcessFactory
     /// </summary>
     /// <param name="process">The <see cref="KernelProcess"/> to start running.</param>
     /// <returns>An instance of <see cref="KernelProcess"/> that can be used to interogate or stop the running process.</returns>
-    public static Task<LocalKernelProcessContext> StartAsync(KernelProcess process)
+    public static Task<LocalKernelProcessContext> StartAsync(this KernelProcess process, Kernel kernel, KernelProcessEvent initialEvent)
     {
-        return Task.FromResult(new LocalKernelProcessContext());
+        var processContext = new LocalKernelProcessContext(process);
+        processContext.Start(kernel, initialEvent);
+        return Task.FromResult(processContext);
     }
 
+    /// <summary>
+    /// Starts the existing process with the specified Id.
+    /// </summary>
+    /// <param name="processId">The unique Id of the process.</param>
+    /// <returns>An instance of <see cref="KernelProcess"/> that can be used to interogate or stop the running process.</returns>
     public static Task<LocalKernelProcessContext> StartAsync(string processId)
     {
-        return Task.FromResult(new LocalKernelProcessContext());
+        return Task.FromResult(new LocalKernelProcessContext(processId));
     }
 }

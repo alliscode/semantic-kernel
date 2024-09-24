@@ -1,7 +1,6 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
 using System;
-using System.Diagnostics;
 using System.Threading.Tasks;
 
 namespace Microsoft.SemanticKernel.Process;
@@ -12,13 +11,21 @@ namespace Microsoft.SemanticKernel.Process;
 public class LocalKernelProcessContext
 {
     private readonly string _processId;
+    private readonly LocalProcess _localProcess;
+    private Task _processTask;
 
     internal LocalKernelProcessContext(KernelProcess process)
     {
         Verify.NotNull(process);
-        _processId = process.State?.Id ?? Guid.NewGuid().ToString();
+        Verify.NotNullOrWhiteSpace(process.State?.Name);
 
-        // TODO: build internal representation of the process
+        this._localProcess = new LocalProcess(
+            process,
+            kernel: new Kernel(),
+            parentProcessId: null,
+            loggerFactory: null);
+
+        this._processId = this._localProcess.Id;
     }
 
     internal LocalKernelProcessContext(string processId)
@@ -27,11 +34,10 @@ public class LocalKernelProcessContext
         // TODO: Get process by Id
     }
 
-    internal Task StartAsync()
+    internal void Start(Kernel kernel, KernelProcessEvent initialEvent)
     {
-        return Task.CompletedTask;
+        this._processTask = this._localProcess.ExecuteAsync(kernel, initialEvent, 100);
     }
-
 
     /// <summary>
     /// Stops the running process.
