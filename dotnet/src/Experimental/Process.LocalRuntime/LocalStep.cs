@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Data.SqlTypes;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -47,13 +48,13 @@ internal class LocalStep : KernelProcessMessageChannel
         this._functions = [];
     }
 
-    public virtual ValueTask InitializeAsync(KernelProcessStepInfo stepInfo)
+    public virtual async ValueTask InitializeAsync(KernelProcessStepInfo stepInfo)
     {
         this._logger = this.LoggerFactory?.CreateLogger(stepInfo.InnerStepType) ?? new NullLogger<LocalStep>();
         this._outputEdges = stepInfo.Edges.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToList());
 
         // Instanciate an instance of the inner step object
-        var stepInstance = ActivatorUtilities.CreateInstance(this._kernel.Services, stepInfo.InnerStepType);
+        KernelProcessStep stepInstance = (KernelProcessStep)ActivatorUtilities.CreateInstance(this._kernel.Services, stepInfo.InnerStepType);
         var kernelPlugin = KernelPluginFactory.CreateFromObject(stepInstance);
 
         // Load the kernel functions
@@ -68,7 +69,35 @@ internal class LocalStep : KernelProcessMessageChannel
         this._initialInputs = this.FindInputChannels();
         this._inputs = new(this._initialInputs);
 
-        return default;
+        // Activate the step with user-defined state if needed
+        KernelProcessStepState? stateObject = null;
+        Type? stateType = null;
+
+        if (stepInfo.InnerStepType.TryGetSubtypeOfStatefulStep(out Type? genericStepType) && genericStepType is not null)
+        {
+            // The step is a subclass of KernelProcessStep<>, so we need to extract the generic type argument
+            // and create an instance of the corresponding KernelProcessStepState<>.
+            var userStateType = genericStepType.GetGenericArguments()[0];
+            Verify.NotNull(userStateType);
+
+            stateType = typeof(KernelProcessStepState<>).MakeGenericType(userStateType);
+            Verify.NotNull(stateType);
+
+            stateObject = (KernelProcessStepState?)Activator.CreateInstance(stateType, this.Id, this.Name);
+        }
+        else
+        {
+            // The step is a KernelProcessStep with no user-defined state, so we can use the base KernelProcessStepState.
+            stateType = typeof(KernelProcessStepState);
+            stateObject = new KernelProcessStepState(this.Id, this.Name);
+        }
+
+        Verify.NotNull(stateObject);
+        MethodInfo? methodInfo = stepInfo.InnerStepType.GetMethod(nameof(KernelProcessStep.ActivateAsync), [stateType]);
+        Verify.NotNull(methodInfo);
+
+        methodInfo.Invoke(stepInstance, [stateObject]);
+        await stepInstance.ActivateAsync(stateObject).ConfigureAwait(false);
     }
 
     public IEnumerable<KernelProcessEvent> GetAllEvents()

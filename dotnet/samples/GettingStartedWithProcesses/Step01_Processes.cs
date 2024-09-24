@@ -15,14 +15,23 @@ public class Step01_Processes(ITestOutputHelper output) : BaseTest(output)
     [Fact]
     public async Task UseSimpleProcessAsync()
     {
+        Kernel kernel = Kernel.CreateBuilder()
+            .AddOpenAIChatCompletion(
+                modelId: TestConfiguration.OpenAI.ChatModelId,
+                apiKey: TestConfiguration.OpenAI.ApiKey)
+            .Build();
+
         ProcessBuilder process = new("ChatBot");
         var introStep = process.AddStepFromType<IntroStep>();
         var userInputStep = process.AddStepFromType<UserInputStep>();
         var responseStep = process.AddStepFromType<ChatBotResponseStep>();
 
+        process.OnExternalEvent("StartProcess")
+            .SendEventTo(new ProcessFunctionTargetBuilder(introStep, "PrintIntroMessage"));
+
         // When the intro is complete, notify the userInput step
         introStep
-            .OnEvent(ChatBotEvents.IntroComplete)
+            .OnFunctionResult("PrintIntroMessage")
             .SendEventTo(new ProcessFunctionTargetBuilder(userInputStep, "GetUserInput"));
 
         // When the userInput step emits an exit event, send it to the end steprt
@@ -41,6 +50,8 @@ public class Step01_Processes(ITestOutputHelper output) : BaseTest(output)
             .SendEventTo(new ProcessFunctionTargetBuilder(userInputStep, "GetUserInput"));
 
         KernelProcess kernelProcess = process.Build();
+
+        var runningProcess = await LocalKernelProcessFactory.StartAsync(kernelProcess, kernel, new KernelProcessEvent() { Id = "StartProcess", Data = null });
     }
 
     public class IntroStep : KernelProcessStep
