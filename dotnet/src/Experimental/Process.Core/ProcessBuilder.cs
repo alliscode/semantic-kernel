@@ -9,23 +9,85 @@ namespace Microsoft.SemanticKernel;
 /// <summary>
 /// Provides functionality for incrementally defining a process.
 /// </summary>
-public class ProcessBuilder : ProcessStepBuilder
+public sealed class ProcessBuilder : ProcessStepBuilder
 {
     private readonly List<ProcessStepBuilder> _steps;
     private readonly List<ProcessStepBuilder> _entrySteps;
     private readonly Dictionary<string, ProcessStepBuilder> _stepsMap;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="ProcessBuilder"/> class.
+    /// Used to resolve the target function and parameter for a given optional function name and parameter name.
+    /// This is used to simplify the process of creating a <see cref="KernelProcessFunctionTarget"/> by making it possible
+    /// to infer the function and/or parameter names from the function metadata if only one option exists.
     /// </summary>
-    /// <param name="name">The name of the process. This is required.</param>
-    public ProcessBuilder(string name)
-        : base(name)
+    /// <param name="functionName">The name of the function. May be null if only one function exists on the step.</param>
+    /// <param name="parameterName">The name of the parameter. May be null if only one parameter exists on the function.</param>
+    /// <returns>A valid instance of <see cref="KernelProcessFunctionTarget"/> for this step.</returns>
+    /// <exception cref="InvalidOperationException"></exception>
+    internal override KernelProcessFunctionTarget ResolveFunctionTarget(string? functionName, string? parameterName)
     {
-        this._steps = [];
-        this._entrySteps = [];
-        this._stepsMap = [];
+        // Try to resolve the function target on each of the registered entry points.
+        var targets = new List<KernelProcessFunctionTarget>();
+        foreach (var step in this._entrySteps)
+        {
+            try
+            {
+                targets.Add(step.ResolveFunctionTarget(functionName, parameterName));
+            }
+            catch (KernelException)
+            {
+                // If the function is not found on the source step, then we can ignore it.
+            }
+        }
+
+        // If no targets were found or if multiple targets were found, throw an exception.
+        if (targets.Count == 0)
+        {
+            throw new InvalidOperationException($"No targets found for the specified function and parameter '{functionName}.{parameterName}'.");
+        }
+        else if (targets.Count > 1)
+        {
+            throw new InvalidOperationException($"Multiple targets found for the specified function and parameter '{functionName}.{parameterName}'.");
+        }
+
+        return targets[0];
     }
+
+    /// <inheritdoc/>
+    internal override void LinkTo(string eventId, ProcessStepEdgeBuilder edgeBuilder)
+    {
+        // Keep track of the entry point steps
+        this._entrySteps.Add(edgeBuilder.Source);
+        base.LinkTo(eventId, edgeBuilder);
+    }
+
+    /// <inheritdoc/>
+    internal override string GetScopedEventId(string eventId)
+    {
+        // The event id is scoped to the process name
+        return $"{this.Name}.{eventId}";
+    }
+
+    /// <inheritdoc/>
+    internal override Dictionary<string, KernelFunctionMetadata> GetFunctionMetadataMap()
+    {
+        // The process has no kernel functions of its own, but it does expose the functions from its entry steps.
+        // Merge the function metadata map from each of the entry steps.
+        return this._entrySteps.SelectMany(step => step.GetFunctionMetadataMap())
+                               .ToDictionary(pair => pair.Key, pair => pair.Value);
+    }
+
+    /// <summary>
+    /// Builds the step.
+    /// </summary>
+    /// <returns></returns>
+    internal override KernelProcessStepInfo BuildStep()
+    {
+        // The process is a step so we can return the step info directly.
+        return this.Build();
+    }
+
+    #region Public Interface
 
     /// <summary>
     /// A read-only collection of steps in the process.
@@ -65,11 +127,11 @@ public class ProcessBuilder : ProcessStepBuilder
     }
 
     /// <summary>
-    /// Provides an instance of <see cref="ProcessEdgeBuilder"/> for defining an edge to a
+    /// Provides an instance of <see cref="ProcessStepEdgeBuilder"/> for defining an edge to a
     /// step inside the process for a given external event.
     /// </summary>
     /// <param name="eventId">The Id of the external event.</param>
-    /// <returns>An instance of <see cref="ProcessEdgeBuilder"/></returns>
+    /// <returns>An instance of <see cref="ProcessStepEdgeBuilder"/></returns>
     public ProcessStepEdgeBuilder OnExternalEvent(string eventId)
     {
         return new ProcessStepEdgeBuilder(this, eventId);
@@ -86,68 +148,17 @@ public class ProcessBuilder : ProcessStepBuilder
         return process;
     }
 
-    internal override KernelProcessStepInfo BuildStep()
-    {
-        return this.Build();
-    }
-
     /// <summary>
-    /// Used to resolve the target function and parameter for a given optional function name and parameter name.
-    /// This is used to simplify the process of creating a <see cref="KernelProcessFunctionTarget"/> by making it possible
-    /// to infer the function and/or parameter names from the function metadata if only one option exists.
+    /// Initializes a new instance of the <see cref="ProcessBuilder"/> class.
     /// </summary>
-    /// <param name="functionName">The name of the function. May be null if only one function exists on the step.</param>
-    /// <param name="parameterName">The name of the parameter. May be null if only one parameter exists on the function.</param>
-    /// <returns>A valid instance of <see cref="KernelProcessFunctionTarget"/> for this step.</returns>
-    /// <exception cref="InvalidOperationException"></exception>
-    internal override KernelProcessFunctionTarget ResolveFunctionTarget(string? functionName, string? parameterName)
+    /// <param name="name">The name of the process. This is required.</param>
+    public ProcessBuilder(string name)
+        : base(name)
     {
-        // Try to resolve the function target on each of the registered entry points.
-        var targets = new List<KernelProcessFunctionTarget>();
-        foreach (var step in this._entrySteps)
-        {
-            try
-            {
-                targets.Add(step.ResolveFunctionTarget(functionName, parameterName));
-            }
-            catch (InvalidOperationException)
-            {
-                // If the function is not found on the source step, then we can ignore it.
-            }
-        }
-
-        // If no targets were found or if multiple targets were found, throw an exception.
-        if (targets.Count == 0)
-        {
-            throw new InvalidOperationException($"No targets found for the specified function and parameter '{functionName}.{parameterName}'.");
-        }
-        else if (targets.Count > 1)
-        {
-            throw new InvalidOperationException($"Multiple targets found for the specified function and parameter '{functionName}.{parameterName}'.");
-        }
-
-        return targets[0];
+        this._steps = [];
+        this._entrySteps = [];
+        this._stepsMap = [];
     }
 
-    /// <inheritdoc/>
-    internal override void LinkTo(string eventId, ProcessStepEdgeBuilder edgeBuilder)
-    {
-        // Keep track of the entry point steps
-        this._entrySteps.Add(edgeBuilder.Source);
-        base.LinkTo(eventId, edgeBuilder);
-    }
-
-    /// <inheritdoc/>
-    internal override string GetScopedEventId(string eventId)
-    {
-        return $"{this.Name}.{eventId}";
-    }
-
-    /// <inheritdoc/>
-    internal override Dictionary<string, KernelFunctionMetadata> GetFuctionMetadataMap()
-    {
-        // Merge the function metadata map from each of the entry steps
-        return this._entrySteps.SelectMany(step => step.GetFuctionMetadataMap())
-                               .ToDictionary(pair => pair.Key, pair => pair.Value);
-    }
+    #endregion
 }

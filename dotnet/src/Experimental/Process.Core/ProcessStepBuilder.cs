@@ -7,27 +7,21 @@ using System.Linq;
 namespace Microsoft.SemanticKernel;
 
 /// <summary>
-/// Provides functionality for incrementally defining a process step and linking it to other steps within a Process.
+/// An abstract class that provides functionality for incrementally defining a process step and linking it to other steps within a Process.
 /// </summary>
 public abstract class ProcessStepBuilder
 {
-    /// <summary>A mapping of function names to the functions themselves.</summary>
-    protected Dictionary<string, KernelFunctionMetadata> FunctionsDict { get; set; }
+    #region Public Interface
 
     /// <summary>
-    /// The unique identifier for the step.
+    /// The unique identifier for the step. This may be null until the step is run within a process.
     /// </summary>
-    public string? Id { get; init; }
+    public string? Id { get; }
 
     /// <summary>
     /// The name of the step. This is intended to be a human-readable name and is not required to be unique.
     /// </summary>
-    public string Name { get; init; }
-
-    /// <summary>
-    /// A mapping of event Ids to the edges that are triggered by those events.
-    /// </summary>
-    protected Dictionary<string, List<ProcessStepEdgeBuilder>> Edges { get; init; }
+    public string Name { get; }
 
     /// <summary>
     /// Define the behavior of the step when the event with the specified Id is fired.
@@ -50,6 +44,18 @@ public abstract class ProcessStepBuilder
     {
         return this.OnEvent($"{functionName}.OnResult");
     }
+
+    #endregion
+
+    /// <summary>
+    /// A mapping of function names to the functions themselves.
+    /// </summary>
+    internal Dictionary<string, KernelFunctionMetadata> FunctionsDict { get; set; }
+
+    /// <summary>
+    /// A mapping of event Ids to the edges that are triggered by those events.
+    /// </summary>
+    internal Dictionary<string, List<ProcessStepEdgeBuilder>> Edges { get; }
 
     /// <summary>
     /// Builds the step.
@@ -89,7 +95,7 @@ public abstract class ProcessStepBuilder
 
         if (this.FunctionsDict.Count == 0)
         {
-            throw new InvalidOperationException($"The target step {this.Name} has no functions.");
+            throw new KernelException($"The target step {this.Name} has no functions.");
         }
 
         // If the function name is null or whitespace, then there can only one function on the step
@@ -97,7 +103,7 @@ public abstract class ProcessStepBuilder
         {
             if (this.FunctionsDict.Count > 1)
             {
-                throw new InvalidOperationException("The target step has more than one function, so a function name must be provided.");
+                throw new KernelException("The target step has more than one function, so a function name must be provided.");
             }
 
             verifiedFunctionName = this.FunctionsDict.Keys.First();
@@ -106,7 +112,7 @@ public abstract class ProcessStepBuilder
         // Verify that the target function exists
         if (!this.FunctionsDict.TryGetValue(verifiedFunctionName!, out var kernelFunctionMetadata) || kernelFunctionMetadata is null)
         {
-            throw new InvalidOperationException($"The function {functionName} does not exist on step {this.Name}");
+            throw new KernelException($"The function {functionName} does not exist on step {this.Name}");
         }
 
         // If the parameter name is null or whitespace, then the function must have 0 or 1 parameters
@@ -116,7 +122,7 @@ public abstract class ProcessStepBuilder
 
             if (undeterminedParameters.Count > 1)
             {
-                throw new InvalidOperationException($"The function {functionName} on step {this.Name} has more than one parameter, so a parameter name must be provided.");
+                throw new KernelException($"The function {functionName} on step {this.Name} has more than one parameter, so a parameter name must be provided.");
             }
 
             // We can infer the parameter name from the function metadata
@@ -147,7 +153,7 @@ public abstract class ProcessStepBuilder
     /// Loads a mapping of function names to the associated functions metadata.
     /// </summary>
     /// <returns>A <see cref="Dictionary{TKey, TValue}"/> where TKey is <see cref="string"/> and TValue is <see cref="KernelFunctionMetadata"/></returns>
-    internal abstract Dictionary<string, KernelFunctionMetadata> GetFuctionMetadataMap();
+    internal abstract Dictionary<string, KernelFunctionMetadata> GetFunctionMetadataMap();
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ProcessStepBuilder"/> class.
@@ -173,13 +179,13 @@ public sealed class ProcessStepBuilder<TStep> : ProcessStepBuilder where TStep :
     private readonly string _eventNamespace;
 
     /// <summary>
-    /// Creates a new instance of the <see cref="ProcessStepBuilder"/> class.
+    /// Creates a new instance of the <see cref="ProcessStepBuilder"/> class. If a name is not provided, the name will be derived from the type of the step.
     /// </summary>
     public ProcessStepBuilder(string? name = null)
         : base(name ?? typeof(TStep).Name)
     {
         this._eventNamespace = $"{this.Name}_{this.Id}";
-        this.FunctionsDict = this.GetFuctionMetadataMap();
+        this.FunctionsDict = this.GetFunctionMetadataMap();
     }
 
     /// <summary>
@@ -188,89 +194,48 @@ public sealed class ProcessStepBuilder<TStep> : ProcessStepBuilder where TStep :
     /// <returns>An instance of <see cref="KernelProcessStepInfo"/></returns>
     internal override KernelProcessStepInfo BuildStep()
     {
-        if (TryGetSubtypeOfStatefulStep(typeof(TStep), out Type? genericStepType) && genericStepType is not null)
+        KernelProcessStepState? stateObject = null;
+
+        if (typeof(TStep).TryGetSubtypeOfStatefulStep(out Type? genericStepType) && genericStepType is not null)
         {
+            // The step is a subclass of KernelProcessStep<>, so we need to extract the generic type argument
+            // and create an instance of the corresponding KernelProcessStepState<>.
             var userStateType = genericStepType.GetGenericArguments()[0];
             Verify.NotNull(userStateType);
 
             var stateType = typeof(KernelProcessStepState<>).MakeGenericType(userStateType);
             Verify.NotNull(stateType);
 
-            var state = (KernelProcessStepState?)Activator.CreateInstance(stateType, this.Id, this.Name);
-            Verify.NotNull(state);
-
-            return new KernelProcessStepInfo(typeof(TStep), state, this.Edges.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Select(e => e.Build()).ToList()));
+            stateObject = (KernelProcessStepState?)Activator.CreateInstance(stateType, this.Id, this.Name);
         }
         else
         {
-            var state = new KernelProcessStepState(this.Id, this.Name);
-            return new KernelProcessStepInfo(typeof(TStep), state, this.Edges.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Select(e => e.Build()).ToList()));
-        }
-    }
-
-    private static bool TryGetSubtypeOfStatefulStep(Type? type, out Type? genericStateType)
-    {
-        var genericType = typeof(KernelProcessStep<>);
-        while (type != null && type != typeof(object))
-        {
-            if (type.IsGenericType && type.GetGenericTypeDefinition() == genericType)
-            {
-                genericStateType = type;
-                return true;
-            }
-
-            type = type.BaseType;
+            // The step is a KernelProcessStep with no user-defined state, so we can use the base KernelProcessStepState.
+            stateObject = new KernelProcessStepState(this.Id, this.Name);
         }
 
-        genericStateType = null;
-        return false;
+        Verify.NotNull(stateObject);
+
+        // Build the edges first
+        var builtEdges = this.Edges.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Select(e => e.Build()).ToList());
+
+        // Then build the step with the edges and state.
+        var builtStep = new KernelProcessStepInfo(typeof(TStep), stateObject, builtEdges);
+        return builtStep;
     }
 
     /// <inheritdoc/>
     internal override string GetScopedEventId(string eventId)
     {
+        // Scope the event to this instance of this step by prefixing the event Id with the step's namespace.
         return $"{this._eventNamespace}.{eventId}";
     }
 
     /// <inheritdoc/>
-    internal override Dictionary<string, KernelFunctionMetadata> GetFuctionMetadataMap()
+    internal override Dictionary<string, KernelFunctionMetadata> GetFunctionMetadataMap()
     {
         // TODO: Should not have to create a new instance of the step to get the functions metadata.
         var functions = KernelPluginFactory.CreateFromType<TStep>();
         return functions.ToDictionary(f => f.Name, f => f.Metadata);
-    }
-}
-
-/// <summary>
-/// Represents the end of a process.
-/// </summary>
-public sealed class EndStep : ProcessStepBuilder
-{
-    /// <summary>
-    /// The static instance of the <see cref="EndStep"/> class.
-    /// </summary>
-    public static EndStep Instance { get; } = new EndStep();
-
-    /// <summary>
-    /// Represents the end of a process.
-    /// </summary>
-    internal EndStep()
-        : base("END")
-    {
-    }
-
-    internal override string GetScopedEventId(string eventId)
-    {
-        return eventId;
-    }
-
-    internal override Dictionary<string, KernelFunctionMetadata> GetFuctionMetadataMap()
-    {
-        return [];
-    }
-
-    internal override KernelProcessStepInfo BuildStep()
-    {
-        return new KernelProcessStepInfo(typeof(KernelProcessStepState), new KernelProcessStepState(), []);
     }
 }

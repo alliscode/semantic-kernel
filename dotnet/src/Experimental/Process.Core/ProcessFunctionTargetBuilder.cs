@@ -26,6 +26,7 @@ public sealed class ProcessFunctionTargetBuilder
             return;
         }
 
+        // Make sure the function target is valid.
         var target = step.ResolveFunctionTarget(functionName, parameterName);
         Verify.NotNull(target);
 
@@ -33,8 +34,13 @@ public sealed class ProcessFunctionTargetBuilder
         this.ParameterName = target.ParameterName;
     }
 
-    public KernelProcessFunctionTarget Build()
+    /// <summary>
+    /// Builds the function target.
+    /// </summary>
+    /// <returns>An instance of <see cref="KernelProcessFunctionTarget"/></returns>
+    internal KernelProcessFunctionTarget Build()
     {
+        Verify.NotNull(this.Step.Id);
         return new KernelProcessFunctionTarget(this.Step.Id, this.FunctionName, this.ParameterName);
     }
 
