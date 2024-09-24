@@ -33,7 +33,6 @@ public sealed class ProcessEdgeBuilder
     /// <summary>
     /// Sends the output of the source step to the specified target when the associated event fires.
     /// </summary>
-    /// <param name="outputTarget">The output target.</param>
     public void SendEventTo(ProcessFunctionTargetBuilder target)
     {
         this.Target = target;
