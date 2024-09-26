@@ -19,6 +19,7 @@ internal sealed class LocalProcess : LocalStep, IDisposable
     private readonly JoinableTaskFactory _joinableTaskFactory;
     private readonly JoinableTaskContext _joinableTaskContext;
     private readonly Channel<KernelProcessEvent> _externalEventChannel;
+    private readonly Queue<KernelProcessEvent> _eventQueue = new();
 
     internal readonly List<KernelProcessStepInfo> _stepsInfos;
     internal readonly List<LocalStep> _steps;
@@ -159,6 +160,18 @@ internal sealed class LocalProcess : LocalStep, IDisposable
         await this._externalEventChannel.Writer.WriteAsync(processEvent).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Emits an event from the step.
+    /// </summary>
+    /// <param name="processEvent">The event to emit.</param>
+    /// <returns>A <see cref="ValueTask"/></returns>
+    public override ValueTask EmitEventAsync(KernelProcessEvent processEvent)
+    {
+        var scopedEvent = processEvent with { Id = this.StepScopedEventId(processEvent.Id!) };
+        this._eventQueue.Enqueue(scopedEvent);
+        return default;
+    }
+
     private async Task Internal_ExecuteAsync(Kernel? kernel = null, int maxSupersteps = 100, bool keepAlive = true, CancellationToken cancellationToken = default)
     {
         Kernel localKernel = kernel ?? this._kernel;
@@ -171,12 +184,12 @@ internal sealed class LocalProcess : LocalStep, IDisposable
             for (int superstep = 0; superstep < maxSupersteps; superstep++)
             {
                 // Check for external events
-                this.EnqueueExternalEventsAsync(messageChannel);
+                this.EnqueueExternalEvents(messageChannel);
 
                 // Get all of the messages that have been sent to the steps within the process and queue them up for processing.
                 foreach (var step in this._steps)
                 {
-                    this.EnqueueStepMessagesAsync(step, localKernel, messageChannel);
+                    this.EnqueueStepMessages(step, localKernel, messageChannel);
                 }
 
                 // Complete the writing side, indicating no more messages in this superstep.
@@ -231,7 +244,7 @@ internal sealed class LocalProcess : LocalStep, IDisposable
         return;
     }
 
-    private void EnqueueExternalEventsAsync(Queue<LocalMessage> stepQueue)
+    private void EnqueueExternalEvents(Queue<LocalMessage> stepQueue)
     {
         while (this._externalEventChannel.Reader.TryRead(out var externalEvent))
         {
@@ -252,7 +265,7 @@ internal sealed class LocalProcess : LocalStep, IDisposable
         }
     }
 
-    private void EnqueueStepMessagesAsync(LocalStep step, Kernel kernel, Queue<LocalMessage> messageChannel)
+    private void EnqueueStepMessages(LocalStep step, Kernel kernel, Queue<LocalMessage> messageChannel)
     {
         // Process all of the messages that have been sent to this step
         var allStepEvents = step.GetAllEvents();
