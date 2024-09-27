@@ -19,7 +19,6 @@ internal sealed class LocalProcess : LocalStep, IDisposable
     private readonly JoinableTaskContext _joinableTaskContext;
     private readonly Channel<KernelProcessEvent> _externalEventChannel;
     private readonly Lazy<ValueTask> _initializeTask;
-    private readonly Queue<KernelProcessEvent> _eventQueue = new();
 
     internal readonly List<KernelProcessStepInfo> _stepsInfos;
     internal readonly List<LocalStep> _steps = [];
@@ -300,6 +299,13 @@ internal sealed class LocalProcess : LocalStep, IDisposable
         var allStepEvents = step.GetAllEvents();
         foreach (var stepEvent in allStepEvents)
         {
+            // Emit the event if it's visibility is public
+            if (stepEvent.Visibility == KernelProcessEventVisibility.Public)
+            {
+                base.EmitEvent(stepEvent);
+            }
+
+            // Get the edges for the event and queue up the messages to be sent to the next steps.
             foreach (var edge in step.GetEdgeForEvent(stepEvent.Id!))
             {
                 var target = edge.OutputTarget;

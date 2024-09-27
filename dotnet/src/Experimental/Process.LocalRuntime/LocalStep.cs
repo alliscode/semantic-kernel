@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.SemanticKernel.Process;
 
 namespace Microsoft.SemanticKernel;
 
@@ -25,9 +26,10 @@ internal class LocalStep : KernelProcessMessageChannel
 
     private readonly Dictionary<string, KernelFunction> _functions = [];
     private readonly Kernel _kernel;
-    private readonly Queue<KernelProcessEvent> _eventQueue = new();
+    private readonly Queue<LocalEvent> _outgoingEventQueue = new();
     private readonly Lazy<ValueTask> _initializeTask;
     private readonly KernelProcessStepInfo _stepInfo;
+    private readonly string _eventNamespace;
     private readonly ILogger? _logger;
 
     protected readonly string? ParentProcessId;
@@ -60,6 +62,7 @@ internal class LocalStep : KernelProcessMessageChannel
         this._initializeTask = new Lazy<ValueTask>(this.InitializeStepAsync);
         this._logger = this.LoggerFactory?.CreateLogger(this._stepInfo.InnerStepType) ?? new NullLogger<LocalStep>();
         this._outputEdges = this._stepInfo.Edges.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToList());
+        this._eventNamespace = $"{this._stepInfo.State.Name}_{this._stepInfo.State.Id}";
     }
 
     /// <summary>
@@ -76,10 +79,10 @@ internal class LocalStep : KernelProcessMessageChannel
     /// Retrieves all events that have been emitted by this step in the previous superstep.
     /// </summary>
     /// <returns>An <see cref="IEnumerable{T}"/> where T is <see cref="KernelProcessEvent"/></returns>
-    internal IEnumerable<KernelProcessEvent> GetAllEvents()
+    internal IEnumerable<LocalEvent> GetAllEvents()
     {
-        var allEvents = this._eventQueue.ToArray();
-        this._eventQueue.Clear();
+        var allEvents = this._outgoingEventQueue.ToArray();
+        this._outgoingEventQueue.Clear();
         return allEvents;
     }
 
@@ -110,21 +113,8 @@ internal class LocalStep : KernelProcessMessageChannel
     /// <returns>A <see cref="ValueTask"/></returns>
     public override ValueTask EmitEventAsync(KernelProcessEvent processEvent)
     {
-        var scopedEvent = processEvent with { Id = this.StepScopedEventId(processEvent.Id!) };
-        this._eventQueue.Enqueue(scopedEvent);
+        this.EmitEvent(LocalEvent.FromKernelProcessEvent(processEvent, this._eventNamespace));
         return default;
-    }
-
-    /// <summary>
-    /// Invokes the provides function with the provided kernel and arguments.
-    /// </summary>
-    /// <param name="function">The function to invoke.</param>
-    /// <param name="kernel">The kernel to use for invocation.</param>
-    /// <param name="arguments">The arguments to invoke with.</param>
-    /// <returns>A <see cref="Task"/> containing the result of the function invocation.</returns>
-    private Task<FunctionResult> InvokeFunction(KernelFunction function, Kernel kernel, KernelArguments arguments)
-    {
-        return kernel.InvokeAsync(function, arguments: arguments);
     }
 
     /// <summary>
@@ -340,12 +330,35 @@ internal class LocalStep : KernelProcessMessageChannel
     }
 
     /// <summary>
-    /// Generates a scoped event Id for the step.
+    /// Invokes the provides function with the provided kernel and arguments.
     /// </summary>
-    /// <param name="eventId">The current Id of the event.</param>
-    /// <returns>A <see cref="string"/> with the scoped Id.</returns>
-    private string StepScopedEventId(string eventId)
+    /// <param name="function">The function to invoke.</param>
+    /// <param name="kernel">The kernel to use for invocation.</param>
+    /// <param name="arguments">The arguments to invoke with.</param>
+    /// <returns>A <see cref="Task"/> containing the result of the function invocation.</returns>
+    private Task<FunctionResult> InvokeFunction(KernelFunction function, Kernel kernel, KernelArguments arguments)
     {
-        return $"{this.Name}_{this.Id}.{eventId}";
+        return kernel.InvokeAsync(function, arguments: arguments);
+    }
+
+    /// <summary>
+    /// Emits an event from the the step.
+    /// </summary>
+    /// <param name="localEvent">The event to emit.</param>
+    protected void EmitEvent(LocalEvent localEvent)
+    {
+        var scopedEvent = this.ScopedEvent(localEvent);
+        this._outgoingEventQueue.Enqueue(scopedEvent);
+    }
+
+    /// <summary>
+    /// Generates a scoped event for the step.
+    /// </summary>
+    /// <param name="localEvent">The event.</param>
+    /// <returns>A <see cref="LocalEvent"/> with the correctly scoped namespace.</returns>
+    protected LocalEvent ScopedEvent(LocalEvent localEvent)
+    {
+        Verify.NotNull(localEvent);
+        return localEvent with { Namespace = $"{this.Name}_{this.Id}" };
     }
 }

@@ -229,7 +229,7 @@ public sealed class ProcessStepBuilder<TStep> : ProcessStepBuilder where TStep :
     internal override string GetScopedEventId(string eventId)
     {
         // Scope the event to this instance of this step by prefixing the event Id with the step's namespace.
-        return $"{this._eventNamespace}.{eventId}";
+        return $"{this._eventNamespace}/{eventId}";
     }
 
     /// <inheritdoc/>
