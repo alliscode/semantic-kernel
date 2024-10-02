@@ -9,7 +9,7 @@ namespace Microsoft.SemanticKernel;
 /// </summary>
 public sealed class ProcessStepEdgeBuilder
 {
-    internal ProcessTargetBuilder? Target { get; set; }
+    internal ProcessFunctionTargetBuilder? Target { get; set; }
 
     /// <summary>
     /// The event Id that the edge fires on.
@@ -51,21 +51,6 @@ public sealed class ProcessStepEdgeBuilder
     /// </summary>
     /// <param name="target">The output target.</param>
     public void SendEventTo(ProcessFunctionTargetBuilder target)
-    {
-        if (this.Target is not null)
-        {
-            throw new InvalidOperationException("An output target has already been set.");
-        }
-
-        this.Target = target;
-        this.Source.LinkTo(this.EventId, this);
-    }
-
-    /// <summary>
-    /// Signals that the output of the source step should be sent to the specified target when the associated event fires.
-    /// </summary>
-    /// <param name="target">The output target.</param>
-    public void SendEventTo(ProcessEventTargetBuilder target)
     {
         if (this.Target is not null)
         {

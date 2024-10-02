@@ -143,32 +143,18 @@ internal sealed class LocalProcess : LocalStep, IDisposable
     /// <exception cref="KernelException"></exception>
     internal override async Task HandleMessageAsync(LocalMessage message)
     {
-        if (message is LocalMessageWithEventTarget eventMessage)
+        if (string.IsNullOrWhiteSpace(message.TargetEventId))
         {
-            if (this._outputEdges!.TryGetValue(eventMessage.EventId, out List<KernelProcessEdge>? edges) && edges is not null)
+            throw new KernelException("Internal Process Error: The target event id must be specified when sending a message to a step.");
+        }
+
+        string eventId = message.TargetEventId!;
+        if (this._outputEdges!.TryGetValue(eventId, out List<KernelProcessEdge>? edges) && edges is not null)
+        {
+            foreach (var edge in edges)
             {
-                foreach (var edge in edges)
-                {
-                    if (edge.OutputTarget is not KernelProcessFunctionTarget functionTarget)
-                    {
-                        throw new KernelException("The output target of a message must be a KernelProcessFunctionTarget.");
-                    }
-
-                    //Dictionary<string, object?> parameterValue = new();
-                    //if (!string.IsNullOrWhiteSpace(functionTarget.ParameterName))
-                    //{
-                    //    parameterValue.Add(functionTarget.ParameterName!, eventMessage.Data);
-                    //}
-
-                    //LocalMessageWithFunctionTarget functionMessage = new(edge.SourceStepId, edge.OutputTarget.StepId, functionTarget.FunctionName, parameterValue);
-                    
-                    KernelProcessEvent internalEvent = new() { Id = eventMessage.EventId, Data = eventMessage.Data, Visibility = KernelProcessEventVisibility.Internal };
-                    //var destinationStep = this._steps.First(v => v.Id == edge.OutputTarget.StepId);
-                    
-                    //await destinationStep.HandleMessageAsync(functionMessage).ConfigureAwait(false);
-
-                    await this.RunOnceAsync(internalEvent).ConfigureAwait(false);
-                }
+                var nestedEvent = new KernelProcessEvent() { Id = eventId, Data = message.TargetEventData, Visibility = KernelProcessEventVisibility.Internal };
+                await this.RunOnceAsync(nestedEvent, this._kernel).ConfigureAwait(false);
             }
         }
     }
@@ -179,7 +165,7 @@ internal sealed class LocalProcess : LocalStep, IDisposable
     /// Loads the process and initializes the steps. Once this is complete the process can be started.
     /// </summary>
     /// <returns>A <see cref="Task"/></returns>
-    private async ValueTask InitializeProcessAsync()
+    private ValueTask InitializeProcessAsync()
     {
         // Initialize the input and output edges for the process
         this._outputEdges = this._process.Edges.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToList());
@@ -223,6 +209,8 @@ internal sealed class LocalProcess : LocalStep, IDisposable
 
             this._steps.Add(localStep);
         }
+
+        return default;
     }
 
     /// <summary>
@@ -352,20 +340,8 @@ internal sealed class LocalProcess : LocalStep, IDisposable
             {
                 foreach (var edge in edges)
                 {
-                    if (edge.OutputTarget is not KernelProcessFunctionTarget functionTarget)
-                    {
-                        throw new KernelException("The output target of a message must be a KernelProcessFunctionTarget.");
-                    }
-
-                    Dictionary<string, object?> parameterValue = new();
-                    if (!string.IsNullOrWhiteSpace(functionTarget.ParameterName))
-                    {
-                        parameterValue.Add(functionTarget.ParameterName!, externalEvent.Data);
-                    }
-
-                    var localEvent = this.ScopedEvent(externalEvent);
-                    LocalMessageWithFunctionTarget newMessage = new(edge.SourceStepId, edge.OutputTarget.StepId, functionTarget.FunctionName, parameterValue);
-                    messageChannel.Enqueue(newMessage);
+                    LocalMessage message = LocalMessageFactory.CreateFromEdge(edge, externalEvent.Data);
+                    messageChannel.Enqueue(message);
                 }
             }
         }
@@ -391,23 +367,8 @@ internal sealed class LocalProcess : LocalStep, IDisposable
             // Get the edges for the event and queue up the messages to be sent to the next steps.
             foreach (var edge in step.GetEdgeForEvent(stepEvent.Id!))
             {
-                var target = edge.OutputTarget;
-                if (target is KernelProcessFunctionTarget functionTarget)
-                {
-                    Dictionary<string, object?> parameterValue = new();
-                    if (!string.IsNullOrWhiteSpace(functionTarget.ParameterName))
-                    {
-                        parameterValue.Add(functionTarget.ParameterName!, stepEvent.Data);
-                    }
-
-                    LocalMessageWithFunctionTarget newMessage = new(edge.SourceStepId, target.StepId, functionTarget.FunctionName, parameterValue);
-                    messageChannel.Enqueue(newMessage);
-                }
-                else if (target is KernelProcessEventTarget eventTarget)
-                {
-                    LocalMessageWithEventTarget newMessage = new(edge.SourceStepId, target.StepId, eventTarget.EventName, stepEvent.Data);
-                    messageChannel.Enqueue(newMessage);
-                }
+                LocalMessage message = LocalMessageFactory.CreateFromEdge(edge, stepEvent.Data);
+                messageChannel.Enqueue(message);
             }
         }
     }

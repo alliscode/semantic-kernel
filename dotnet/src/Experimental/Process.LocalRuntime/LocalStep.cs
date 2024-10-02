@@ -127,7 +127,6 @@ internal class LocalStep : KernelProcessMessageChannel
     internal virtual async Task HandleMessageAsync(LocalMessage message)
     {
         Verify.NotNull(message);
-        var validMessage = message as LocalMessageWithFunctionTarget ?? throw new KernelException("The message is not of the expected type.");
 
         // Lazy one-time initialization of the step before processing a message
         await this._initializeTask.Value.ConfigureAwait(false);
@@ -137,21 +136,21 @@ internal class LocalStep : KernelProcessMessageChannel
             throw new KernelException("The step has not been initialized.");
         }
 
-        string messageLogParameters = string.Join(", ", validMessage.Values.Select(kvp => $"{kvp.Key}: {kvp.Value}"));
-        this._logger?.LogDebug("Received message from '{SourceId}' targeting function '{FunctionName}' and parameters '{Parameters}'.", validMessage.SourceId, validMessage.FunctionName, messageLogParameters);
+        string messageLogParameters = string.Join(", ", message.Values.Select(kvp => $"{kvp.Key}: {kvp.Value}"));
+        this._logger?.LogDebug("Received message from '{SourceId}' targeting function '{FunctionName}' and parameters '{Parameters}'.", message.SourceId, message.FunctionName, messageLogParameters);
 
         // Add the message values to the inputs for the function
-        foreach (var kvp in validMessage.Values)
+        foreach (var kvp in message.Values)
         {
-            if (this._inputs.TryGetValue(validMessage.FunctionName, out Dictionary<string, object?>? functionName) && functionName != null && functionName.TryGetValue(kvp.Key, out object? parameterName) && parameterName != null)
+            if (this._inputs.TryGetValue(message.FunctionName, out Dictionary<string, object?>? functionName) && functionName != null && functionName.TryGetValue(kvp.Key, out object? parameterName) && parameterName != null)
             {
-                this._logger?.LogWarning("Step {StepName} already has input for {FunctionName}.{Key}, it is being overwritten with a message from Step named '{SourceId}'.", this.Name, validMessage.FunctionName, kvp.Key, validMessage.SourceId);
+                this._logger?.LogWarning("Step {StepName} already has input for {FunctionName}.{Key}, it is being overwritten with a message from Step named '{SourceId}'.", this.Name, message.FunctionName, kvp.Key, message.SourceId);
             }
 
-            if (!this._inputs.TryGetValue(validMessage.FunctionName, out Dictionary<string, object?>? functionParameters))
+            if (!this._inputs.TryGetValue(message.FunctionName, out Dictionary<string, object?>? functionParameters))
             {
-                this._inputs[validMessage.FunctionName] = new();
-                functionParameters = this._inputs[validMessage.FunctionName];
+                this._inputs[message.FunctionName] = new();
+                functionParameters = this._inputs[message.FunctionName];
             }
 
             functionParameters![kvp.Key] = kvp.Value;
@@ -169,8 +168,8 @@ internal class LocalStep : KernelProcessMessageChannel
         }
 
         // A message can only target one function and should not result in a different function being invoked.
-        var targetFunction = invocableFunctions.FirstOrDefault((name) => name == validMessage.FunctionName) ??
-            throw new InvalidOperationException($"A message targeting function '{validMessage.FunctionName}' has resulted in a function named '{invocableFunctions.First()}' becoming invocable. Are the function names configured correctly?");
+        var targetFunction = invocableFunctions.FirstOrDefault((name) => name == message.FunctionName) ??
+            throw new InvalidOperationException($"A message targeting function '{message.FunctionName}' has resulted in a function named '{invocableFunctions.First()}' becoming invocable. Are the function names configured correctly?");
 
         this._logger?.LogDebug("Step with Id `{StepId}` received all required input for function [{TargetFunction}] and is executing.", this.Name, targetFunction);
 

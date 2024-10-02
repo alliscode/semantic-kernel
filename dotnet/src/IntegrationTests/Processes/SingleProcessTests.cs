@@ -68,7 +68,7 @@ public sealed class SingleProcessTests
             .SendEventTo(new ProcessFunctionTargetBuilder(echoStep));
 
         echoStep.OnFunctionResult("Echo")
-            .SendEventTo(new ProcessEventTargetBuilder(nestedStep, "Start"));
+            .SendEventTo(nestedStep.GetTargetForExternalEvent("Start"));
 
         var process = processBuilder.Build();
 
@@ -79,8 +79,6 @@ public sealed class SingleProcessTests
         // Assert
         var innerProcess = processInfo.Steps.Where(s => s.State.Name == "LinearProcess").Single() as KernelProcess;
         Assert.NotNull(innerProcess);
-
-
         var repeatStepState = innerProcess.Steps.Where(s => s.State.Name == nameof(RepeatStep)).Single().State as KernelProcessStepState<StepState>;
         Assert.NotNull(repeatStepState?.State);
         Assert.Equal("Go Go", repeatStepState.State.LastMessage);

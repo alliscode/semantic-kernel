@@ -3,20 +3,6 @@
 using System.Collections.Generic;
 
 namespace Microsoft.SemanticKernel;
-
-internal abstract record LocalMessage(string sourceId, string destinationId)
-{
-    /// <summary>
-    /// Gets the source identifier of the message.
-    /// </summary>
-    public string SourceId { get; } = sourceId;
-
-    /// <summary>
-    /// Gets the destination identifier of the message.
-    /// </summary>
-    public string DestinationId { get; } = destinationId;
-}
-
 /// <summary>
 /// Represents a local message used in the local runtime.
 /// </summary>
@@ -27,25 +13,37 @@ internal abstract record LocalMessage(string sourceId, string destinationId)
 /// <param name="destinationId">The destination identifier of the message.</param>
 /// <param name="functionName">The name of the function associated with the message.</param>
 /// <param name="values">The dictionary of values associated with the message.</param>
-internal record LocalMessageWithFunctionTarget(string sourceId, string destinationId, string functionName, Dictionary<string, object?> values) : LocalMessage(sourceId, destinationId)
+/// <param name="targetEventId">The Id of the target event.</param>
+/// <param name="targetEventData"></param>
+internal record LocalMessage(string sourceId, string destinationId, string functionName, Dictionary<string, object?> values)
 {
+    /// <summary>
+    /// Gets the source identifier of the message.
+    /// </summary>
+    public string SourceId { get; init; } = sourceId;
+
+    /// <summary>
+    /// Gets the destination identifier of the message.
+    /// </summary>
+    public string DestinationId { get; init; } = destinationId;
+
     /// <summary>
     /// Gets the name of the function associated with the message.
     /// </summary>
-    public string FunctionName { get; } = functionName;
+    public string FunctionName { get; init; } = functionName;
 
     /// <summary>
     /// Gets the dictionary of values associated with the message.
     /// </summary>
-    public Dictionary<string, object?> Values { get; } = values;
-}
+    public Dictionary<string, object?> Values { get; init; } = values;
 
-internal record LocalMessageWithEventTarget(string sourceId, string destinationId, string eventId, object? data) : LocalMessage(sourceId, destinationId)
-{
     /// <summary>
-    /// Gets the event identifier of the message.
+    /// The Id of the target event. This may be null if the message is not targeting a sub-process.
     /// </summary>
-    public string EventId { get; } = eventId;
+    public string? TargetEventId { get; init; }
 
-    public object? Data { get; } = data;
+    /// <summary>
+    /// The data associated with the target event. This may be null if the message is not targeting a sub-process.
+    /// </summary>
+    public object? TargetEventData { get; init; }
 }

@@ -15,12 +15,12 @@ public sealed class KernelProcessEdge
     /// <summary>
     /// The collection of <see cref="KernelProcessFunctionTarget"/>s that are the output of the source Step.
     /// </summary>
-    public KernelProcessTarget OutputTarget { get; }
+    public KernelProcessFunctionTarget OutputTarget { get; }
 
     /// <summary>
     /// Creates a new instance of the <see cref="KernelProcessEdge"/> class.
     /// </summary>
-    public KernelProcessEdge(string sourceStepId, KernelProcessTarget outputTargets)
+    public KernelProcessEdge(string sourceStepId, KernelProcessFunctionTarget outputTargets)
     {
         Verify.NotNullOrWhiteSpace(sourceStepId);
         Verify.NotNull(outputTargets);

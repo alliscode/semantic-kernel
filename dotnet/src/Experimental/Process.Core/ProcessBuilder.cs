@@ -11,9 +11,10 @@ namespace Microsoft.SemanticKernel;
 /// </summary>
 public sealed class ProcessBuilder : ProcessStepBuilder
 {
-    private readonly List<ProcessStepBuilder> _steps;
-    private readonly List<ProcessStepBuilder> _entrySteps;
-    private readonly Dictionary<string, ProcessStepBuilder> _stepsMap;
+    private readonly List<ProcessStepBuilder> _steps = [];
+    private readonly List<ProcessStepBuilder> _entrySteps = [];
+    private readonly Dictionary<string, ProcessFunctionTargetBuilder> _externalEventTargetMap = [];
+    private readonly Dictionary<string, ProcessStepBuilder> _stepsMap = [];
 
     /// <summary>
     /// A boolean indicating if the current process is a step within another process.
@@ -61,8 +62,12 @@ public sealed class ProcessBuilder : ProcessStepBuilder
     /// <inheritdoc/>
     internal override void LinkTo(string eventId, ProcessStepEdgeBuilder edgeBuilder)
     {
+        Verify.NotNull(edgeBuilder?.Source, nameof(edgeBuilder.Source));
+        Verify.NotNull(edgeBuilder?.Target, nameof(edgeBuilder.Target));
+
         // Keep track of the entry point steps
         this._entrySteps.Add(edgeBuilder.Source);
+        this._externalEventTargetMap[eventId] = edgeBuilder.Target;
         base.LinkTo(eventId, edgeBuilder);
     }
 
@@ -144,6 +149,27 @@ public sealed class ProcessBuilder : ProcessStepBuilder
     }
 
     /// <summary>
+    /// Retrieves the target for a given external event. The step associated with the target is the process itself (this).
+    /// </summary>
+    /// <param name="eventId">The Id of the event</param>
+    /// <returns>An instance of <see cref="ProcessFunctionTargetBuilder"/></returns>
+    /// <exception cref="KernelException"></exception>
+    public ProcessFunctionTargetBuilder GetTargetForExternalEvent(string eventId)
+    {
+        Verify.NotNullOrWhiteSpace(eventId);
+
+        // Need to transform the target to this process, and include the event Id to allow the actual target to be resolved.
+        if (!this._externalEventTargetMap.TryGetValue(eventId, out var target))
+        {
+            throw new KernelException($"The process named '{this.Name}' does not expose an event with Id '{eventId}'.");
+        }
+
+        // The target is addressing a step in the process, so we need to transform it to address the process itself.
+        var processTarget = target with { Step = this, TargetEventId = eventId };
+        return processTarget;
+    }
+
+    /// <summary>
     /// Builds the process.
     /// </summary>
     /// <returns>An instance of <see cref="KernelProcess"/></returns>
@@ -169,9 +195,6 @@ public sealed class ProcessBuilder : ProcessStepBuilder
     public ProcessBuilder(string name)
         : base(name)
     {
-        this._steps = [];
-        this._entrySteps = [];
-        this._stepsMap = [];
     }
 
     #endregion

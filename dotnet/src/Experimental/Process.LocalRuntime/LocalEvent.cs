@@ -35,8 +35,8 @@ internal record LocalEvent
     /// <summary>
     /// Initializes a new instance of the <see cref="LocalEvent"/> class.
     /// </summary>
-    /// <param name="eventNamespace"></param>
-    /// <param name="innerEvent"></param>
+    /// <param name="eventNamespace">The namespace of the event.</param>
+    /// <param name="innerEvent">The instance of <see cref="KernelProcessEvent"/> that this <see cref="LocalEvent"/> came from.</param>
     internal LocalEvent(string? eventNamespace, KernelProcessEvent innerEvent)
     {
         this.Namespace = eventNamespace;
