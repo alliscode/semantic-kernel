@@ -3,17 +3,8 @@
 using System.Collections.Generic;
 
 namespace Microsoft.SemanticKernel;
-/// <summary>
-/// Represents a local message used in the local runtime.
-/// </summary>
-/// <remarks>
-/// Initializes a new instance of the <see cref="LocalMessage"/> class.
-/// </remarks>
-/// <param name="sourceId">The source identifier of the message.</param>
-/// <param name="destinationId">The destination identifier of the message.</param>
-/// <param name="functionName">The name of the function associated with the message.</param>
-/// <param name="values">The dictionary of values associated with the message.</param>
-internal class LocalMessage(string sourceId, string destinationId, string functionName, Dictionary<string, object?> values)
+
+internal abstract record LocalMessage(string sourceId, string destinationId)
 {
     /// <summary>
     /// Gets the source identifier of the message.
@@ -24,7 +15,20 @@ internal class LocalMessage(string sourceId, string destinationId, string functi
     /// Gets the destination identifier of the message.
     /// </summary>
     public string DestinationId { get; } = destinationId;
+}
 
+/// <summary>
+/// Represents a local message used in the local runtime.
+/// </summary>
+/// <remarks>
+/// Initializes a new instance of the <see cref="LocalMessage"/> class.
+/// </remarks>
+/// <param name="sourceId">The source identifier of the message.</param>
+/// <param name="destinationId">The destination identifier of the message.</param>
+/// <param name="functionName">The name of the function associated with the message.</param>
+/// <param name="values">The dictionary of values associated with the message.</param>
+internal record LocalMessageWithFunctionTarget(string sourceId, string destinationId, string functionName, Dictionary<string, object?> values) : LocalMessage(sourceId, destinationId)
+{
     /// <summary>
     /// Gets the name of the function associated with the message.
     /// </summary>
@@ -34,4 +38,14 @@ internal class LocalMessage(string sourceId, string destinationId, string functi
     /// Gets the dictionary of values associated with the message.
     /// </summary>
     public Dictionary<string, object?> Values { get; } = values;
+}
+
+internal record LocalMessageWithEventTarget(string sourceId, string destinationId, string eventId, object? data) : LocalMessage(sourceId, destinationId)
+{
+    /// <summary>
+    /// Gets the event identifier of the message.
+    /// </summary>
+    public string EventId { get; } = eventId;
+
+    public object? Data { get; } = data;
 }

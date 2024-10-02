@@ -16,6 +16,11 @@ public sealed class ProcessBuilder : ProcessStepBuilder
     private readonly Dictionary<string, ProcessStepBuilder> _stepsMap;
 
     /// <summary>
+    /// A boolean indicating if the current process is a step within another process.
+    /// </summary>
+    internal bool HasParentProcess { get; set; }
+
+    /// <summary>
     /// Used to resolve the target function and parameter for a given optional function name and parameter name.
     /// This is used to simplify the process of creating a <see cref="KernelProcessFunctionTarget"/> by making it possible
     /// to infer the function and/or parameter names from the function metadata if only one option exists.
@@ -114,7 +119,7 @@ public sealed class ProcessBuilder : ProcessStepBuilder
     /// </summary>
     /// <param name="kernelProcess">The process to add as a step.</param>
     /// <returns>An instance of <see cref="ProcessStepBuilder"/></returns>
-    public ProcessStepBuilder AddStepFromProcess(ProcessBuilder kernelProcess)
+    public ProcessBuilder AddStepFromProcess(ProcessBuilder kernelProcess)
     {
         // TODO: Could this method be converted to an "AddStepFromObject" method takes an
         // instance of ProcessStepBase and adds it to the process?
@@ -123,6 +128,7 @@ public sealed class ProcessBuilder : ProcessStepBuilder
 
         this._steps.Add(kernelProcess);
         this._stepsMap[kernelProcess.Name] = kernelProcess;
+        kernelProcess.HasParentProcess = true;
         return kernelProcess;
     }
 
@@ -151,7 +157,7 @@ public sealed class ProcessBuilder : ProcessStepBuilder
         var builtSteps = this._steps.Select(step => step.BuildStep()).ToList();
 
         // Create the process
-        var state = new KernelProcessState(this.Name);
+        var state = new KernelProcessState(this.Name, id: this.HasParentProcess ? this.Id : null);
         var process = new KernelProcess(state, builtSteps, builtEdges);
         return process;
     }

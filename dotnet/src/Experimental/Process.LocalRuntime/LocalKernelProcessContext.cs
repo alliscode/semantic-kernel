@@ -46,6 +46,8 @@ public sealed class LocalKernelProcessContext : IDisposable
     /// <returns>A <see cref="Task"/></returns>
     public async Task StopAsync() => await this._localProcess.StopAsync().ConfigureAwait(false);
 
+    public async Task<KernelProcess> GetInfoAsync() => await this._localProcess.GetProcessInfoAsync().ConfigureAwait(false);
+
     /// <summary>
     /// Disposes of the resources used by the process.
     /// </summary>

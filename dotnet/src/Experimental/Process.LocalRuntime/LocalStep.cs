@@ -21,10 +21,7 @@ internal class LocalStep : KernelProcessMessageChannel
     /// The generic state type for a process step.
     /// </summary>
     private static readonly Type s_genericType = typeof(KernelProcessStep<>);
-    private Dictionary<string, Dictionary<string, object?>?>? _inputs;
-    private Dictionary<string, Dictionary<string, object?>?>? _initialInputs;
 
-    private readonly Dictionary<string, KernelFunction> _functions = [];
     private readonly Kernel _kernel;
     private readonly Queue<LocalEvent> _outgoingEventQueue = new();
     private readonly Lazy<ValueTask> _initializeTask;
@@ -32,9 +29,13 @@ internal class LocalStep : KernelProcessMessageChannel
     private readonly string _eventNamespace;
     private readonly ILogger? _logger;
 
+    protected KernelProcessStepState? _stepState;
+    protected Dictionary<string, Dictionary<string, object?>?>? _inputs;
+    protected Dictionary<string, Dictionary<string, object?>?>? _initialInputs;
+    protected readonly Dictionary<string, KernelFunction> _functions = [];
     protected readonly string? ParentProcessId;
     protected readonly ILoggerFactory? LoggerFactory;
-    protected Dictionary<string, List<KernelProcessEdge>>? _outputEdges;
+    protected Dictionary<string, List<KernelProcessEdge>> _outputEdges;
 
     /// <summary>
     /// Represents a step in a process that is running in-process.
@@ -123,8 +124,11 @@ internal class LocalStep : KernelProcessMessageChannel
     /// <param name="message">The message to process.</param>
     /// <returns>A <see cref="Task"/></returns>
     /// <exception cref="KernelException"></exception>
-    internal async Task HandleMessageAsync(LocalMessage message)
+    internal virtual async Task HandleMessageAsync(LocalMessage message)
     {
+        Verify.NotNull(message);
+        var validMessage = message as LocalMessageWithFunctionTarget ?? throw new KernelException("The message is not of the expected type.");
+
         // Lazy one-time initialization of the step before processing a message
         await this._initializeTask.Value.ConfigureAwait(false);
 
@@ -133,21 +137,21 @@ internal class LocalStep : KernelProcessMessageChannel
             throw new KernelException("The step has not been initialized.");
         }
 
-        string messageLogParameters = string.Join(", ", message.Values.Select(kvp => $"{kvp.Key}: {kvp.Value}"));
-        this._logger?.LogDebug("Received message from '{SourceId}' targeting function '{FunctionName}' and parameters '{Parameters}'.", message.SourceId, message.FunctionName, messageLogParameters);
+        string messageLogParameters = string.Join(", ", validMessage.Values.Select(kvp => $"{kvp.Key}: {kvp.Value}"));
+        this._logger?.LogDebug("Received message from '{SourceId}' targeting function '{FunctionName}' and parameters '{Parameters}'.", validMessage.SourceId, validMessage.FunctionName, messageLogParameters);
 
         // Add the message values to the inputs for the function
-        foreach (var kvp in message.Values)
+        foreach (var kvp in validMessage.Values)
         {
-            if (this._inputs.TryGetValue(message.FunctionName, out Dictionary<string, object?>? functionName) && functionName != null && functionName.TryGetValue(kvp.Key, out object? parameterName) && parameterName != null)
+            if (this._inputs.TryGetValue(validMessage.FunctionName, out Dictionary<string, object?>? functionName) && functionName != null && functionName.TryGetValue(kvp.Key, out object? parameterName) && parameterName != null)
             {
-                this._logger?.LogWarning("Step {StepName} already has input for {FunctionName}.{Key}, it is being overwritten with a message from Step named '{SourceId}'.", this.Name, message.FunctionName, kvp.Key, message.SourceId);
+                this._logger?.LogWarning("Step {StepName} already has input for {FunctionName}.{Key}, it is being overwritten with a message from Step named '{SourceId}'.", this.Name, validMessage.FunctionName, kvp.Key, validMessage.SourceId);
             }
 
-            if (!this._inputs.TryGetValue(message.FunctionName, out Dictionary<string, object?>? functionParameters))
+            if (!this._inputs.TryGetValue(validMessage.FunctionName, out Dictionary<string, object?>? functionParameters))
             {
-                this._inputs[message.FunctionName] = new();
-                functionParameters = this._inputs[message.FunctionName];
+                this._inputs[validMessage.FunctionName] = new();
+                functionParameters = this._inputs[validMessage.FunctionName];
             }
 
             functionParameters![kvp.Key] = kvp.Value;
@@ -165,8 +169,8 @@ internal class LocalStep : KernelProcessMessageChannel
         }
 
         // A message can only target one function and should not result in a different function being invoked.
-        var targetFunction = invocableFunctions.FirstOrDefault((name) => name == message.FunctionName) ??
-            throw new InvalidOperationException($"A message targeting function '{message.FunctionName}' has resulted in a function named '{invocableFunctions.First()}' becoming invocable. Are the function names configured correctly?");
+        var targetFunction = invocableFunctions.FirstOrDefault((name) => name == validMessage.FunctionName) ??
+            throw new InvalidOperationException($"A message targeting function '{validMessage.FunctionName}' has resulted in a function named '{invocableFunctions.First()}' becoming invocable. Are the function names configured correctly?");
 
         this._logger?.LogDebug("Step with Id `{StepId}` received all required input for function [{TargetFunction}] and is executing.", this.Name, targetFunction);
 
@@ -210,7 +214,7 @@ internal class LocalStep : KernelProcessMessageChannel
     /// </summary>
     /// <returns>A <see cref="ValueTask"/></returns>
     /// <exception cref="KernelException"></exception>
-    private async ValueTask InitializeStepAsync()
+    protected virtual async ValueTask InitializeStepAsync()
     {
         // Instantiate an instance of the inner step object
         KernelProcessStep stepInstance = (KernelProcessStep)ActivatorUtilities.CreateInstance(this._kernel.Services, this._stepInfo.InnerStepType);
@@ -267,6 +271,7 @@ internal class LocalStep : KernelProcessMessageChannel
             throw new KernelException("The ActivateAsync method for the KernelProcessStep could not be found.");
         }
 
+        this._stepState = stateObject;
         methodInfo.Invoke(stepInstance, [stateObject]);
         await stepInstance.ActivateAsync(stateObject).ConfigureAwait(false);
     }
@@ -278,7 +283,7 @@ internal class LocalStep : KernelProcessMessageChannel
     /// </summary>
     /// <returns><see cref="Dictionary{TKey, TValue}"/></returns>
     /// <exception cref="InvalidOperationException"></exception>
-    private Dictionary<string, Dictionary<string, object?>?> FindInputChannels()
+    protected Dictionary<string, Dictionary<string, object?>?> FindInputChannels()
     {
         if (this._functions is null)
         {
@@ -291,6 +296,10 @@ internal class LocalStep : KernelProcessMessageChannel
             inputs[kvp.Key] = new();
             foreach (var param in kvp.Value.Metadata.Parameters)
             {
+                if (!param.IsRequired)
+                {
+                    continue;
+                }
                 if (param.ParameterType == typeof(KernelProcessStepContext))
                 {
                     inputs[kvp.Key]![param.Name] = new KernelProcessStepContext(this);
@@ -341,6 +350,15 @@ internal class LocalStep : KernelProcessMessageChannel
         return kernel.InvokeAsync(function, arguments: arguments);
     }
 
+    internal virtual async Task<KernelProcessStepInfo> ToKernelProcessStepInfoAsync()
+    {
+        // Lazy one-time initialization of the step before extracting state information
+        await this._initializeTask.Value.ConfigureAwait(false);
+
+        var stepInfo = new KernelProcessStepInfo(this._stepInfo.InnerStepType, this._stepState!, this._outputEdges);
+        return stepInfo;
+    }
+
     /// <summary>
     /// Emits an event from the the step.
     /// </summary>
@@ -360,5 +378,16 @@ internal class LocalStep : KernelProcessMessageChannel
     {
         Verify.NotNull(localEvent);
         return localEvent with { Namespace = $"{this.Name}_{this.Id}" };
+    }
+
+    /// <summary>
+    /// Generates a scoped event for the step.
+    /// </summary>
+    /// <param name="processEvent">The event.</param>
+    /// <returns>A <see cref="LocalEvent"/> with the correctly scoped namespace.</returns>
+    protected LocalEvent ScopedEvent(KernelProcessEvent processEvent)
+    {
+        Verify.NotNull(processEvent);
+        return LocalEvent.FromKernelProcessEvent(processEvent, $"{this.Name}_{this.Id}");
     }
 }
