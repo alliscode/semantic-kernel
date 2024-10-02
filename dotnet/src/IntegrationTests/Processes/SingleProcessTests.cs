@@ -37,7 +37,7 @@ public sealed class SingleProcessTests
 
         // Act
         var procesHandle = await process.StartAsync(kernel, new() { Id = "Start", Data = "Go" });
-        var processInfo = await procesHandle.GetInfoAsync();
+        var processInfo = await procesHandle.GetStateAsync();
 
         // Assert
         var repeatStepState = processInfo.Steps.Where(s => s.State.Name == nameof(RepeatStep)).Single().State as KernelProcessStepState<StepState>;
@@ -74,7 +74,7 @@ public sealed class SingleProcessTests
 
         // Act
         var procesHandle = await process.StartAsync(kernel, new() { Id = "Start", Data = "Go" });
-        var processInfo = await procesHandle.GetInfoAsync();
+        var processInfo = await procesHandle.GetStateAsync();
 
         // Assert
         var innerProcess = processInfo.Steps.Where(s => s.State.Name == "LinearProcess").Single() as KernelProcess;
@@ -98,44 +98,47 @@ public sealed class SingleProcessTests
 
         return processBuilder;
     }
+}
 
-    /// <summary>
-    /// A step that echos its input.
-    /// </summary>
-    private sealed class EchoStep : KernelProcessStep
+/// <summary>
+/// A step that echos its input.
+/// </summary>
+public sealed class EchoStep : KernelProcessStep
+{
+    [KernelFunction]
+    public string Echo(string message) => message;
+}
+
+/// <summary>
+/// A step that repeats its input.
+/// </summary>
+public sealed class RepeatStep : KernelProcessStep<StepState>
+{
+    private readonly StepState _state = new();
+
+    public override ValueTask ActivateAsync(KernelProcessStepState<StepState> state)
     {
-        [KernelFunction]
-        public string Echo(string message) => message;
-    }
-
-    /// <summary>
-    /// A step that repeats its input.
-    /// </summary>
-    private sealed class RepeatStep : KernelProcessStep<StepState>
-    {
-        private readonly StepState _state = new();
-
-        public override ValueTask ActivateAsync(KernelProcessStepState<StepState> state)
+        if (state.State is null)
         {
-            if (state.State is null)
-            {
-                state.State = this._state;
-            }
-
-            return default;
+            state.State = this._state;
         }
 
-        [KernelFunction]
-        public string Repeat(string message, int count = 2)
-        {
-            var output = string.Join(" ", Enumerable.Repeat(message, count));
-            this._state.LastMessage = output;
-            return output;
-        }
+        return default;
     }
 
-    private sealed class StepState
+    [KernelFunction]
+    public string Repeat(string message, int count = 2)
     {
-        public string? LastMessage { get; set; }
+        var output = string.Join(" ", Enumerable.Repeat(message, count));
+        this._state.LastMessage = output;
+        return output;
     }
+}
+
+/// <summary>
+/// The state object for the repeat step.
+/// </summary>
+public sealed record StepState
+{
+    public string? LastMessage { get; set; }
 }

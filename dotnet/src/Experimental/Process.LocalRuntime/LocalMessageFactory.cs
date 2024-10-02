@@ -9,6 +9,12 @@ namespace Microsoft.SemanticKernel.Process;
 /// </summary>
 internal static class LocalMessageFactory
 {
+    /// <summary>
+    /// Creates a new <see cref="LocalMessage"/> instance from a <see cref="KernelProcessEdge"/> and a data object.
+    /// </summary>
+    /// <param name="edge">An instance of <see cref="KernelProcessEdge"/></param>
+    /// <param name="data">A data object.</param>
+    /// <returns>An instance of <see cref="LocalMessage"/></returns>
     internal static LocalMessage CreateFromEdge(KernelProcessEdge edge, object? data)
     {
         var target = edge.OutputTarget;

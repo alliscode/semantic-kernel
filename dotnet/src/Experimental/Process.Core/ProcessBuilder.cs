@@ -14,7 +14,6 @@ public sealed class ProcessBuilder : ProcessStepBuilder
     private readonly List<ProcessStepBuilder> _steps = [];
     private readonly List<ProcessStepBuilder> _entrySteps = [];
     private readonly Dictionary<string, ProcessFunctionTargetBuilder> _externalEventTargetMap = [];
-    private readonly Dictionary<string, ProcessStepBuilder> _stepsMap = [];
 
     /// <summary>
     /// A boolean indicating if the current process is a step within another process.
@@ -114,7 +113,6 @@ public sealed class ProcessBuilder : ProcessStepBuilder
     {
         var stepBuilder = new ProcessStepBuilder<TStep>(name);
         this._steps.Add(stepBuilder);
-        this._stepsMap[stepBuilder.Name] = stepBuilder;
 
         return stepBuilder;
     }
@@ -126,14 +124,8 @@ public sealed class ProcessBuilder : ProcessStepBuilder
     /// <returns>An instance of <see cref="ProcessStepBuilder"/></returns>
     public ProcessBuilder AddStepFromProcess(ProcessBuilder kernelProcess)
     {
-        // TODO: Could this method be converted to an "AddStepFromObject" method takes an
-        // instance of ProcessStepBase and adds it to the process?
-        // This would work for processes.
-        // This would benefit steps because the initial value of state could be captured?
-
-        this._steps.Add(kernelProcess);
-        this._stepsMap[kernelProcess.Name] = kernelProcess;
         kernelProcess.HasParentProcess = true;
+        this._steps.Add(kernelProcess);
         return kernelProcess;
     }
 
@@ -164,7 +156,7 @@ public sealed class ProcessBuilder : ProcessStepBuilder
             throw new KernelException($"The process named '{this.Name}' does not expose an event with Id '{eventId}'.");
         }
 
-        // The target is addressing a step in the process, so we need to transform it to address the process itself.
+        // Targets for external events on a process should be scoped to the process iteself rather than the step inside the process.
         var processTarget = target with { Step = this, TargetEventId = eventId };
         return processTarget;
     }

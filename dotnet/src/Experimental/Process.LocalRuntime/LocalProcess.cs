@@ -26,7 +26,7 @@ internal sealed class LocalProcess : LocalStep, IDisposable
     internal readonly KernelProcess _process;
     internal readonly Kernel _kernel;
 
-    private readonly ILogger? _logger;
+    private readonly ILogger _logger;
     private JoinableTask? _processTask;
     private CancellationTokenSource? _processCancelSource;
 
@@ -136,7 +136,9 @@ internal sealed class LocalProcess : LocalStep, IDisposable
     }
 
     /// <summary>
-    /// Handles a <see cref="LocalMessage"/> that has been sent to the step.
+    /// Handles a <see cref="LocalMessage"/> that has been sent to the process. This happens only in the case
+    /// of a process (this one) running as a step within another process (this one's parent). In this case the
+    /// entire sub-process should be executed within a single superstep.
     /// </summary>
     /// <param name="message">The message to process.</param>
     /// <returns>A <see cref="Task"/></returns>
@@ -145,7 +147,9 @@ internal sealed class LocalProcess : LocalStep, IDisposable
     {
         if (string.IsNullOrWhiteSpace(message.TargetEventId))
         {
-            throw new KernelException("Internal Process Error: The target event id must be specified when sending a message to a step.");
+            string errorMessage = "Internal Process Error: The target event id must be specified when sending a message to a step.";
+            this._logger.LogError("{ErrorMessage}", errorMessage);
+            throw new KernelException(errorMessage);
         }
 
         string eventId = message.TargetEventId!;
@@ -153,6 +157,7 @@ internal sealed class LocalProcess : LocalStep, IDisposable
         {
             foreach (var edge in edges)
             {
+                // Run the nested process completely within a single superstep.
                 var nestedEvent = new KernelProcessEvent() { Id = eventId, Data = message.TargetEventData, Visibility = KernelProcessEventVisibility.Internal };
                 await this.RunOnceAsync(nestedEvent, this._kernel).ConfigureAwait(false);
             }
