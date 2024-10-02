@@ -20,7 +20,7 @@ internal record LocalEvent
     /// <summary>
     /// The Id of the event.
     /// </summary>
-    internal string Id => $"{this.Namespace}/{this.InnerEvent.Id}";
+    internal string Id => $"{this.Namespace}.{this.InnerEvent.Id}";
 
     /// <summary>
     /// The data of the event.

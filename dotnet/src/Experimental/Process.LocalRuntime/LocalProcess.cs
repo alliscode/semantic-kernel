@@ -157,8 +157,11 @@ internal sealed class LocalProcess : LocalStep, IDisposable
         {
             foreach (var edge in edges)
             {
-                // Run the nested process completely within a single superstep.
+                // Create the external event that will be used to start the nested process. Since this event came
+                // from outside this processes, we set the visibility to internal so that it's not emitted back out again.
                 var nestedEvent = new KernelProcessEvent() { Id = eventId, Data = message.TargetEventData, Visibility = KernelProcessEventVisibility.Internal };
+
+                // Run the nested process completely within a single superstep.
                 await this.RunOnceAsync(nestedEvent, this._kernel).ConfigureAwait(false);
             }
         }
@@ -225,19 +228,8 @@ internal sealed class LocalProcess : LocalStep, IDisposable
     /// <exception cref="KernelException"></exception>
     protected override ValueTask InitializeStepAsync()
     {
-        // Instantiate an instance of the inner step object
-        var kernelPlugin = KernelPluginFactory.CreateFromObject(this, pluginName: this._process.State.Name!);
-
-        // Load the kernel functions
-        foreach (KernelFunction f in kernelPlugin)
-        {
-            this._functions.Add(f.Name, f);
-        }
-
-        // Initialize the input channels
-        this._initialInputs = this.FindInputChannels();
-        this._inputs = new(this._initialInputs);
-        this._stepState = this._process.State;
+        // The process does not need any further initialization as it's already been initialized.
+        // Override the base method to prevent it from being called.
         return default;
     }
 

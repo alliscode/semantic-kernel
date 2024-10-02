@@ -150,7 +150,6 @@ public sealed class ProcessBuilder : ProcessStepBuilder
     {
         Verify.NotNullOrWhiteSpace(eventId);
 
-        // Need to transform the target to this process, and include the event Id to allow the actual target to be resolved.
         if (!this._externalEventTargetMap.TryGetValue(eventId, out var target))
         {
             throw new KernelException($"The process named '{this.Name}' does not expose an event with Id '{eventId}'.");

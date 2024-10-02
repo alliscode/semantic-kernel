@@ -29,9 +29,9 @@ internal class LocalStep : KernelProcessMessageChannel
     private readonly string _eventNamespace;
     private readonly ILogger? _logger;
 
-    protected KernelProcessStepState? _stepState;
-    protected Dictionary<string, Dictionary<string, object?>?>? _inputs;
-    protected Dictionary<string, Dictionary<string, object?>?>? _initialInputs;
+    protected KernelProcessStepState _stepState;
+    protected Dictionary<string, Dictionary<string, object?>?>? _inputs = [];
+    protected Dictionary<string, Dictionary<string, object?>?>? _initialInputs = [];
     protected readonly Dictionary<string, KernelFunction> _functions = [];
     protected readonly string? ParentProcessId;
     protected readonly ILoggerFactory? LoggerFactory;
@@ -60,6 +60,7 @@ internal class LocalStep : KernelProcessMessageChannel
         this.LoggerFactory = loggerFactory;
         this._kernel = kernel;
         this._stepInfo = stepInfo;
+        this._stepState = stepInfo.State;
         this._initializeTask = new Lazy<ValueTask>(this.InitializeStepAsync);
         this._logger = this.LoggerFactory?.CreateLogger(this._stepInfo.InnerStepType) ?? new NullLogger<LocalStep>();
         this._outputEdges = this._stepInfo.Edges.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToList());
@@ -240,13 +241,17 @@ internal class LocalStep : KernelProcessMessageChannel
             var userStateType = genericStepType.GetGenericArguments()[0];
             if (userStateType is null)
             {
-                throw new KernelException("The generic type argument for the KernelProcessStep subclass could not be determined.");
+                var errorMessage = "The generic type argument for the KernelProcessStep subclass could not be determined.";
+                this._logger?.LogError("{ErrorMessage}", errorMessage);
+                throw new KernelException(errorMessage);
             }
 
             stateType = typeof(KernelProcessStepState<>).MakeGenericType(userStateType);
             if (stateType is null)
             {
-                throw new KernelException("The generic type argument for the KernelProcessStep subclass could not be determined.");
+                var errorMessage = "The generic type argument for the KernelProcessStep subclass could not be determined.";
+                this._logger?.LogError("{ErrorMessage}", errorMessage);
+                throw new KernelException(errorMessage);
             }
 
             stateObject = (KernelProcessStepState?)Activator.CreateInstance(stateType, this.Name, this.Id);
@@ -260,14 +265,18 @@ internal class LocalStep : KernelProcessMessageChannel
 
         if (stateObject is null)
         {
-            throw new KernelException("The state object for the KernelProcessStep could not be created.");
+            var errorMessage = $"The state object for the KernelProcessStep could not be created.";
+            this._logger?.LogError("{ErrorMessage}", errorMessage);
+            throw new KernelException(errorMessage);
         }
 
         MethodInfo? methodInfo = this._stepInfo.InnerStepType.GetMethod(nameof(KernelProcessStep.ActivateAsync), [stateType]);
 
         if (methodInfo is null)
         {
-            throw new KernelException("The ActivateAsync method for the KernelProcessStep could not be found.");
+            var errorMessage = "The ActivateAsync method for the KernelProcessStep could not be found.";
+            this._logger?.LogError("{ErrorMessage}", errorMessage);
+            throw new KernelException(errorMessage);
         }
 
         this._stepState = stateObject;
@@ -286,7 +295,9 @@ internal class LocalStep : KernelProcessMessageChannel
     {
         if (this._functions is null)
         {
-            throw new InvalidOperationException("The step has not been initialized.");
+            var errorMessage = "Internal Error: The step has not been initialized.";
+            this._logger?.LogError("{ErrorMessage}", errorMessage);
+            throw new KernelException(errorMessage);
         }
 
         Dictionary<string, Dictionary<string, object?>?> inputs = new();
