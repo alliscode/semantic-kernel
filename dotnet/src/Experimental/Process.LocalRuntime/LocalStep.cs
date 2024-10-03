@@ -265,7 +265,7 @@ internal class LocalStep : KernelProcessMessageChannel
 
         if (stateObject is null)
         {
-            var errorMessage = $"The state object for the KernelProcessStep could not be created.";
+            var errorMessage = "The state object for the KernelProcessStep could not be created.";
             this._logger?.LogError("{ErrorMessage}", errorMessage);
             throw new KernelException(errorMessage);
         }

@@ -46,7 +46,7 @@ public class Step01_Processes(ITestOutputHelper output) : BaseTest(output)
 
         // When the userInput step emits an exit event, send it to the end steprt
         userInputStep
-            .OnFunctionResult("GetUserInput")
+            .OnEvent(ChatBotEvents.Exit)
             .StopProcess();
 
         // When the userInput step emits a user input event, send it to the assistantResponse step
