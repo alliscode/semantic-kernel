@@ -247,11 +247,6 @@ internal sealed class LocalProcess : LocalStep, IDisposable
     /// <returns></returns>
     private async Task Internal_ExecuteAsync(Kernel? kernel = null, int maxSupersteps = 100, bool keepAlive = true, CancellationToken cancellationToken = default)
     {
-        if (this.Name == "LinearProcess")
-        {
-            Console.WriteLine("LinearProcess");
-        }
-
         Kernel localKernel = kernel ?? this._kernel;
         Queue<LocalMessage> messageChannel = new();
 
@@ -283,8 +278,6 @@ internal sealed class LocalProcess : LocalStep, IDisposable
                         break;
                     }
                 }
-
-                // Looks like I need to have the process implement HandleExternalEventAsync as a kernel function? It may just work?
 
                 List<Task> messageTasks = [];
                 foreach (var message in messagesToProcess)
@@ -355,7 +348,7 @@ internal sealed class LocalProcess : LocalStep, IDisposable
         var allStepEvents = step.GetAllEvents();
         foreach (var stepEvent in allStepEvents)
         {
-            // Emit the event if it's visibility is public
+            // Emit the event out of the process (this one) if it's visibility is public.
             if (stepEvent.Visibility == KernelProcessEventVisibility.Public)
             {
                 base.EmitEvent(stepEvent);
@@ -383,15 +376,14 @@ internal sealed class LocalProcess : LocalStep, IDisposable
         return new KernelProcess(processState, steps, this._outputEdges);
     }
 
+    /// <summary>
+    /// When the process is used as a step within another process, this method will be called
+    /// rather than ToKernelProcessAsync when extracting the state.
+    /// </summary>
+    /// <returns>A <see cref="Task{T}"/> where T is <see cref="KernelProcess"/></returns>
     internal override async Task<KernelProcessStepInfo> ToKernelProcessStepInfoAsync()
     {
         return await this.ToKernelProcessAsync().ConfigureAwait(false);
-    }
-
-    [KernelFunction]
-    private ValueTask HandleExternalEvent(LocalEvent externalEvent)
-    {
-        return default;
     }
 
     #endregion

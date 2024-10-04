@@ -44,7 +44,7 @@ public class Step01_Processes(ITestOutputHelper output) : BaseTest(output)
             .OnFunctionResult(nameof(IntroStep.PrintIntroMessage))
             .SendEventTo(new ProcessFunctionTargetBuilder(userInputStep));
 
-        // When the userInput step emits an exit event, send it to the end steprt
+        // When the userInput step emits an exit event, send it to the end step
         userInputStep
             .OnEvent(ChatBotEvents.Exit)
             .StopProcess();

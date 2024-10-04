@@ -306,10 +306,14 @@ internal class LocalStep : KernelProcessMessageChannel
             inputs[kvp.Key] = new();
             foreach (var param in kvp.Value.Metadata.Parameters)
             {
+                // Optional parameters are should not be added to the input dictionary.
                 if (!param.IsRequired)
                 {
                     continue;
                 }
+
+                // Parameters of type KernelProcessStepContext are injected by the process
+                // and are instanciated here.
                 if (param.ParameterType == typeof(KernelProcessStepContext))
                 {
                     inputs[kvp.Key]![param.Name] = new KernelProcessStepContext(this);
@@ -360,9 +364,14 @@ internal class LocalStep : KernelProcessMessageChannel
         return kernel.InvokeAsync(function, arguments: arguments);
     }
 
+    /// <summary>
+    /// Extracts the current state of the step and returns it as a <see cref="KernelProcessStepInfo"/>.
+    /// </summary>
+    /// <returns>An instance of <see cref="KernelProcessStepInfo"/></returns>
     internal virtual async Task<KernelProcessStepInfo> ToKernelProcessStepInfoAsync()
     {
-        // Lazy one-time initialization of the step before extracting state information
+        // Lazy one-time initialization of the step before extracting state information.
+        // This allows state information to be extracted even if the step has not been activated.
         await this._initializeTask.Value.ConfigureAwait(false);
 
         var stepInfo = new KernelProcessStepInfo(this._stepInfo.InnerStepType, this._stepState!, this._outputEdges);
@@ -370,7 +379,7 @@ internal class LocalStep : KernelProcessMessageChannel
     }
 
     /// <summary>
-    /// Emits an event from the the step.
+    /// Emits an event from the step.
     /// </summary>
     /// <param name="localEvent">The event to emit.</param>
     protected void EmitEvent(LocalEvent localEvent)

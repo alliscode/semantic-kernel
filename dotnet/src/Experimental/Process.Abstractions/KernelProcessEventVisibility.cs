@@ -4,7 +4,7 @@ namespace Microsoft.SemanticKernel;
 
 /// <summary>
 /// An enumeration representing the visibility of a <see cref="KernelProcessEvent"/>. This is used to determine
-/// if the event is visible is kept within the process, or exposed to external processes and systems.
+/// if the event is kept within the process it's emitted in, or exposed to external processes and systems.
 /// </summary>
 public enum KernelProcessEventVisibility
 {
