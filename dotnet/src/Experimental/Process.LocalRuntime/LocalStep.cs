@@ -291,7 +291,7 @@ internal class LocalStep : KernelProcessMessageChannel
     /// </summary>
     /// <returns><see cref="Dictionary{TKey, TValue}"/></returns>
     /// <exception cref="InvalidOperationException"></exception>
-    protected Dictionary<string, Dictionary<string, object?>?> FindInputChannels()
+    private Dictionary<string, Dictionary<string, object?>?> FindInputChannels()
     {
         if (this._functions is null)
         {
