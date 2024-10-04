@@ -52,7 +52,7 @@ public sealed class ProcessTests
     /// </summary>
     /// <returns>A <see cref="Task"/></returns>
     [Fact]
-    public async Task NestedLinearProcessOuterToInnerAsync()
+    public async Task NestedProcessOuterToInnerWorksAsync()
     {
         // Arrange
         OpenAIConfiguration configuration = this._configuration.GetSection("OpenAI").Get<OpenAIConfiguration>()!;
@@ -69,7 +69,7 @@ public sealed class ProcessTests
         var nestedProcessStep = processBuilder.AddStepFromProcess(this.CreateLinearProcess("Inner"));
 
         // Route the last step of the outer process to trigger the external event that starts the inner process
-        processBuilder.Steps[1].OnEvent(ProcessTestsEvents.OutputReady)
+        processBuilder.Steps[1].OnEvent(ProcessTestsEvents.OutputReadyInternal)
             .SendEventTo(nestedProcessStep.GetTargetForExternalEvent(ProcessTestsEvents.StartProcess));
 
         // Build the outer process
@@ -89,12 +89,12 @@ public sealed class ProcessTests
     }
 
     /// <summary>
-    /// Tests a process with three steps where the third step is a nested process. Events from the outer process
-    /// are routed to the inner process.
+    /// Tests a process with three steps where the third step is a nested process. Events from the inner process
+    /// are routed to the outer process.
     /// </summary>
     /// <returns>A <see cref="Task"/></returns>
     [Fact]
-    public async Task NestedLinearProcessInnerToOuterAsync()
+    public async Task NestedProcessInnerToOuterWorksWithPublicEventAsync()
     {
         // Arrange
         OpenAIConfiguration configuration = this._configuration.GetSection("OpenAI").Get<OpenAIConfiguration>()!;
@@ -115,7 +115,7 @@ public sealed class ProcessTests
             .SendEventTo(nestedProcessStep.GetTargetForExternalEvent(ProcessTestsEvents.StartProcess));
 
         // Route the last step of the inner process to trigger the echo step of the outer process
-        nestedProcessStep.OnEvent(ProcessTestsEvents.OutputReady)
+        nestedProcessStep.OnEvent(ProcessTestsEvents.OutputReadyPublic)
             .SendEventTo(new ProcessFunctionTargetBuilder(processBuilder.Steps[0]));
 
         // Build the outer process
@@ -130,6 +130,50 @@ public sealed class ProcessTests
         var repeatStepState = processInfo.Steps.Where(s => s.State.Name == nameof(RepeatStep)).FirstOrDefault()?.State as KernelProcessStepState<StepState>;
         Assert.NotNull(repeatStepState?.State);
         Assert.Equal(string.Join(" ", Enumerable.Repeat(testInput, 4)), repeatStepState.State.LastMessage);
+    }
+
+    /// <summary>
+    /// Tests a process with three steps where the third step is a nested process. Events from the inner process
+    /// are routed to the outer process.
+    /// </summary>
+    /// <returns>A <see cref="Task"/></returns>
+    [Fact]
+    public async Task NestedProcessInnerToOuterDoesNotWorkWithInternalEventAsync()
+    {
+        // Arrange
+        OpenAIConfiguration configuration = this._configuration.GetSection("OpenAI").Get<OpenAIConfiguration>()!;
+        this._kernelBuilder.AddOpenAIChatCompletion(
+            modelId: configuration.ModelId!,
+            apiKey: configuration.ApiKey);
+
+        Kernel kernel = this._kernelBuilder.Build();
+
+        // Create the outer process
+        var processBuilder = this.CreateLinearProcess("Outer");
+
+        // Create the inner process and add it as a step to the outer process
+        var nestedProcessStep = processBuilder.AddStepFromProcess(this.CreateLinearProcess("Inner"));
+
+        // Add a new external event to start the outer process and handoff to the inner process directly
+        processBuilder.OnExternalEvent(ProcessTestsEvents.StartInnerProcess)
+            .SendEventTo(nestedProcessStep.GetTargetForExternalEvent(ProcessTestsEvents.StartProcess));
+
+        // Route the last step of the inner process to trigger the echo step of the outer process
+        nestedProcessStep.OnEvent(ProcessTestsEvents.OutputReadyInternal)
+            .SendEventTo(new ProcessFunctionTargetBuilder(processBuilder.Steps[0]));
+
+        // Build the outer process
+        var process = processBuilder.Build();
+
+        // Act
+        string testInput = "Test";
+        var procesHandle = await process.StartAsync(kernel, new() { Id = ProcessTestsEvents.StartInnerProcess, Data = testInput });
+        var processInfo = await procesHandle.GetStateAsync();
+
+        // Assert
+        var repeatStepState = processInfo.Steps.Where(s => s.State.Name == nameof(RepeatStep)).FirstOrDefault()?.State as KernelProcessStepState<StepState>;
+        Assert.NotNull(repeatStepState);
+        Assert.Null(repeatStepState.State?.LastMessage);
     }
 
     /// <summary>
@@ -150,7 +194,8 @@ public sealed class ProcessTests
         return processBuilder;
     }
 
-#pragma warning disable CA1812 // Avoid uninstantiated internal classes - These classes are dynamically instantiated by the processes used in the tests.
+#pragma warning disable CA1812 // Avoid uninstantiated internal classes
+    // These classes are dynamically instantiated by the processes used in tests.
 
     /// <summary>
     /// A step that echos its input.
@@ -170,10 +215,7 @@ public sealed class ProcessTests
 
         public override ValueTask ActivateAsync(KernelProcessStepState<StepState> state)
         {
-            if (state.State is null)
-            {
-                state.State = this._state;
-            }
+            state.State ??= this._state;
 
             return default;
         }
@@ -184,7 +226,9 @@ public sealed class ProcessTests
             var output = string.Join(" ", Enumerable.Repeat(message, count));
             this._state.LastMessage = output;
 
-            await context.EmitEventAsync(new() { Id = ProcessTestsEvents.OutputReady, Data = output, Visibility = KernelProcessEventVisibility.Public });
+            // Emit the OnReady event with a public visibility and an internal visibility to aid in testing
+            await context.EmitEventAsync(new() { Id = ProcessTestsEvents.OutputReadyPublic, Data = output, Visibility = KernelProcessEventVisibility.Public });
+            await context.EmitEventAsync(new() { Id = ProcessTestsEvents.OutputReadyInternal, Data = output, Visibility = KernelProcessEventVisibility.Internal });
         }
     }
 
@@ -204,7 +248,8 @@ public sealed class ProcessTests
     {
         public const string StartProcess = "StartProcess";
         public const string StartInnerProcess = "StartInnerProcess";
-        public const string OutputReady = "OutputReady";
+        public const string OutputReadyPublic = "OutputReadyPublic";
+        public const string OutputReadyInternal = "OutputReadyInternal";
     }
 
 #pragma warning restore CA1812 // Avoid uninstantiated internal classes
