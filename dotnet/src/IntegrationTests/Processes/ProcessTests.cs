@@ -129,7 +129,7 @@ public sealed class ProcessTests
         // Assert
         var repeatStepState = processInfo.Steps.Where(s => s.State.Name == nameof(RepeatStep)).FirstOrDefault()?.State as KernelProcessStepState<StepState>;
         Assert.NotNull(repeatStepState?.State);
-        Assert.Equal(string.Join(" ", Enumerable.Repeat(testInput, 2)), repeatStepState.State.LastMessage);
+        Assert.Equal(string.Join(" ", Enumerable.Repeat(testInput, 4)), repeatStepState.State.LastMessage);
     }
 
     /// <summary>
@@ -179,12 +179,12 @@ public sealed class ProcessTests
         }
 
         [KernelFunction]
-        public async Task Repeat(string message, KernelProcessStepContext context, int count = 2)
+        public async Task RepeatAsync(string message, KernelProcessStepContext context, int count = 2)
         {
             var output = string.Join(" ", Enumerable.Repeat(message, count));
             this._state.LastMessage = output;
 
-            await context.EmitEventAsync(new() { Id = ProcessTestsEvents.OutputReady, Data = output });
+            await context.EmitEventAsync(new() { Id = ProcessTestsEvents.OutputReady, Data = output, Visibility = KernelProcessEventVisibility.Public });
         }
     }
 

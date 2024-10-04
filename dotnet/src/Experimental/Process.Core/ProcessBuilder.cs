@@ -11,6 +11,9 @@ namespace Microsoft.SemanticKernel;
 /// </summary>
 public sealed class ProcessBuilder : ProcessStepBuilder
 {
+    /// <summary>The namespace for events that are scoped to this step.</summary>
+    private readonly string _eventNamespace;
+
     private readonly List<ProcessStepBuilder> _steps = [];
     private readonly List<ProcessStepBuilder> _entrySteps = [];
     private readonly Dictionary<string, ProcessFunctionTargetBuilder> _externalEventTargetMap = [];
@@ -73,8 +76,8 @@ public sealed class ProcessBuilder : ProcessStepBuilder
     /// <inheritdoc/>
     internal override string GetScopedEventId(string eventId)
     {
-        // The event id is scoped to the process name
-        return $"{this.Name}.{eventId}";
+        // Scope the event to this instance of this step by prefixing the event Id with the step's namespace.
+        return $"{this._eventNamespace}.{eventId}";
     }
 
     /// <inheritdoc/>
@@ -186,6 +189,7 @@ public sealed class ProcessBuilder : ProcessStepBuilder
     public ProcessBuilder(string name)
         : base(name)
     {
+        this._eventNamespace = $"{this.Name}_{this.Id}";
     }
 
     #endregion
