@@ -202,7 +202,7 @@ internal class ProcessActor : StepActor, IProcess, IDisposable
     /// <param name="message">The message to process.</param>
     /// <returns>A <see cref="Task"/></returns>
     /// <exception cref="KernelException"></exception>
-    internal override async Task HandleMessageAsync(DaprMessage message)
+    protected override async Task HandleMessageAsync(DaprMessage message)
     {
         if (string.IsNullOrWhiteSpace(message.TargetEventId))
         {

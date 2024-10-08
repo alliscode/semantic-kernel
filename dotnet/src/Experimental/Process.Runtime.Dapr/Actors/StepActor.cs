@@ -125,7 +125,7 @@ internal class StepActor : Actor, IStep, IKernelProcessMessageChannel
     /// <param name="message">The message to process.</param>
     /// <returns>A <see cref="Task"/></returns>
     /// <exception cref="KernelException"></exception>
-    internal virtual async Task HandleMessageAsync(DaprMessage message)
+    protected virtual async Task HandleMessageAsync(DaprMessage message)
     {
         Verify.NotNull(message);
 
