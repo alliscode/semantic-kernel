@@ -15,7 +15,7 @@ using Dapr.Actors;
 namespace Microsoft.SemanticKernel.Process.Actors;
 internal class ProcessActor : StepActor, IProcess, IDisposable
 {
-    private const string EndProcessId = "END";
+    private const string EndStepId = "Microsoft.SemanticKernel.Process.EndStep";
     private readonly JoinableTaskFactory _joinableTaskFactory;
     private readonly JoinableTaskContext _joinableTaskContext;
     private readonly Channel<KernelProcessEvent> _externalEventChannel;
@@ -250,7 +250,12 @@ internal class ProcessActor : StepActor, IProcess, IDisposable
             // Run the Pregel algorithm until there are no more messages being sent.
             for (int superstep = 0; superstep < maxSupersteps; superstep++)
             {
-                // TODO: Check for input messages to the EndStep. If so then cancel the process.
+                // Check for EndStep messages. If thare are any then cancel the process.
+                if (await this.IsEndMessageSentAsync().ConfigureAwait(false))
+                {
+                    this._processCancelSource?.Cancel();
+                    break;
+                }
 
                 // Check for external events
                 await this.EnqueueExternalMessagesAsync().ConfigureAwait(false);
@@ -319,6 +324,16 @@ internal class ProcessActor : StepActor, IProcess, IDisposable
         }
     }
 
+    /// <summary>
+    /// Determines is the end message has been sent to the process.
+    /// </summary>
+    /// <returns>True if the end message has been sent, otherwise false.</returns>
+    private async Task<bool> IsEndMessageSentAsync()
+    {
+        var endMessageQueue = this.ProxyFactory.CreateActorProxy<IMessageQueue>(new ActorId(EndStepId), nameof(MessageQueueActor));
+        var messages = await endMessageQueue.DequeueAllAsync().ConfigureAwait(false);
+        return messages.Count > 0;
+    }
 
     /// <summary>
     /// Builds a <see cref="KernelProcess"/> from the current <see cref="ProcessActor"/>.

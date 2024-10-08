@@ -12,7 +12,7 @@ using Dapr.Actors.Runtime;
 using Dapr.Actors;
 
 namespace Microsoft.SemanticKernel.Process.Actors;
-internal class StepActor : Actor, IStep
+internal class StepActor : Actor, IStep, IKernelProcessMessageChannel
 {
     /// <summary>
     /// The generic state type for a process step.
@@ -21,7 +21,7 @@ internal class StepActor : Actor, IStep
 
     private readonly Kernel _kernel;
     private readonly Queue<DaprEvent> _outgoingEventQueue = new();
-    private readonly Lazy<ValueTask> _initializeTask;
+    private readonly Lazy<ValueTask> _activateTask;
 
     private KernelProcessStepInfo? _stepInfo;
     private ILogger? _logger;
@@ -48,7 +48,7 @@ internal class StepActor : Actor, IStep
     {
         this.LoggerFactory = loggerFactory;
         this._kernel = kernel;
-        this._initializeTask = new Lazy<ValueTask>(this.ActivateStepAsync);
+        this._activateTask = new Lazy<ValueTask>(this.ActivateStepAsync);
     }
 
     #region Public Actor Methods
@@ -94,9 +94,9 @@ internal class StepActor : Actor, IStep
     {
         // Lazy one-time initialization of the step before extracting state information.
         // This allows state information to be extracted even if the step has not been activated.
-        await this._initializeTask.Value.ConfigureAwait(false);
+        await this._activateTask.Value.ConfigureAwait(false);
 
-        var stepInfo = new KernelProcessStepInfo(this._stepInfo.InnerStepType, this._stepState!, this._outputEdges);
+        var stepInfo = new KernelProcessStepInfo(this._stepInfo!.InnerStepType, this._stepState!, this._outputEdges!);
         return stepInfo;
     }
 
@@ -130,7 +130,7 @@ internal class StepActor : Actor, IStep
         Verify.NotNull(message);
 
         // Lazy one-time initialization of the step before processing a message
-        await this._initializeTask.Value.ConfigureAwait(false);
+        await this._activateTask.Value.ConfigureAwait(false);
 
         if (this._functions is null || this._inputs is null || this._initialInputs is null)
         {
