@@ -12,7 +12,7 @@ using Microsoft.VisualStudio.Threading;
 using Dapr.Actors.Runtime;
 using Dapr.Actors;
 
-namespace Microsoft.SemanticKernel.Process.Actors;
+namespace Microsoft.SemanticKernel;
 internal class ProcessActor : StepActor, IProcess, IDisposable
 {
     private const string EndStepId = "Microsoft.SemanticKernel.Process.EndStep";
@@ -48,7 +48,7 @@ internal class ProcessActor : StepActor, IProcess, IDisposable
 
     #region Public Actor Methods
 
-    public async ValueTask InitializeProcessAsync(KernelProcess process, string? parentProcessId)
+    public async Task InitializeProcessAsync(KernelProcess process, string? parentProcessId)
     {
         Verify.NotNull(process);
         Verify.NotNull(process.Steps);
@@ -103,7 +103,7 @@ internal class ProcessActor : StepActor, IProcess, IDisposable
     /// <param name="kernel">The <see cref="Kernel"/> instance to use within the running process.</param>
     /// <param name="keepAlive">Indicates if the process should wait for external events after it's finished processing.</param>
     /// <returns> <see cref="Task"/></returns>
-    public Task StartAsync(Kernel? kernel = null, bool keepAlive = true)
+    public Task StartAsync(bool keepAlive)
     {
         if (!this._isInitialized)
         {
@@ -112,7 +112,7 @@ internal class ProcessActor : StepActor, IProcess, IDisposable
 
         this._processCancelSource = new CancellationTokenSource();
         this._processTask = this._joinableTaskFactory.RunAsync(()
-            => this.Internal_ExecuteAsync(kernel, keepAlive: keepAlive, cancellationToken: this._processCancelSource.Token));
+            => this.Internal_ExecuteAsync(this._kernel, keepAlive: keepAlive, cancellationToken: this._processCancelSource.Token));
 
         return Task.CompletedTask;
     }
@@ -124,11 +124,11 @@ internal class ProcessActor : StepActor, IProcess, IDisposable
     /// <param name="processEvent">Required. The <see cref="KernelProcessEvent"/> to start the process with.</param>
     /// <param name="kernel">Optional. A <see cref="Kernel"/> to use when executing the process.</param>
     /// <returns>A <see cref="Task"/></returns>
-    public async Task RunOnceAsync(KernelProcessEvent? processEvent, Kernel? kernel = null)
+    public async Task RunOnceAsync(KernelProcessEvent processEvent)
     {
         Verify.NotNull(processEvent);
         await this._externalEventChannel.Writer.WriteAsync(processEvent).ConfigureAwait(false);
-        await this.StartAsync(kernel, keepAlive: false).ConfigureAwait(false);
+        await this.StartAsync(keepAlive: false).ConfigureAwait(false);
         await this._processTask!.JoinAsync().ConfigureAwait(false);
     }
 
@@ -167,7 +167,7 @@ internal class ProcessActor : StepActor, IProcess, IDisposable
     /// <param name="processEvent">Required. The <see cref="KernelProcessEvent"/> to start the process with.</param>
     /// <param name="kernel">Optional. A <see cref="Kernel"/> to use when executing the process.</param>
     /// <returns>A <see cref="Task"/></returns>
-    public async Task SendMessageAsync(KernelProcessEvent processEvent, Kernel? kernel = null)
+    public async Task SendMessageAsync(KernelProcessEvent processEvent)
     {
         Verify.NotNull(processEvent);
         await this._externalEventChannel.Writer.WriteAsync(processEvent).ConfigureAwait(false);
@@ -202,7 +202,7 @@ internal class ProcessActor : StepActor, IProcess, IDisposable
     /// <param name="message">The message to process.</param>
     /// <returns>A <see cref="Task"/></returns>
     /// <exception cref="KernelException"></exception>
-    protected override async Task HandleMessageAsync(DaprMessage message)
+    internal override async Task HandleMessageAsync(DaprMessage message)
     {
         if (string.IsNullOrWhiteSpace(message.TargetEventId))
         {
@@ -221,7 +221,7 @@ internal class ProcessActor : StepActor, IProcess, IDisposable
                 var nestedEvent = new KernelProcessEvent() { Id = eventId, Data = message.TargetEventData, Visibility = KernelProcessEventVisibility.Internal };
 
                 // Run the nested process completely within a single superstep.
-                await this.RunOnceAsync(nestedEvent, this._kernel).ConfigureAwait(false);
+                await this.RunOnceAsync(nestedEvent).ConfigureAwait(false);
             }
         }
     }

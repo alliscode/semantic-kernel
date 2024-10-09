@@ -8,9 +8,9 @@ namespace Microsoft.SemanticKernel;
 /// <summary>
 /// An interface that represents a step in a process.
 /// </summary>
-internal interface IStep : IActor
+public interface IStep : IActor
 {
-    ValueTask InitializeStepAsync(KernelProcessStepInfo stepInfo, string? parentProcessId);
+    Task InitializeStepAsync(KernelProcessStepInfo stepInfo, string? parentProcessId);
 
     Task<int> PrepareIncomingMessagesAsync();
 

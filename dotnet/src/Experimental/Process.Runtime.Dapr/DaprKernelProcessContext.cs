@@ -1,0 +1,41 @@
+﻿// Copyright (c) Microsoft. All rights reserved.
+
+using System;
+using System.Threading.Tasks;
+using Dapr.Actors;
+using Dapr.Actors.Client;
+
+namespace Microsoft.SemanticKernel;
+
+/// <summary>
+/// A context for a Dapr kernel process.
+/// </summary>
+public class DaprKernelProcessContext
+{
+    private readonly IProcess _daprProcess;
+    private readonly Kernel _kernel;
+    private readonly KernelProcess _process;
+
+    internal DaprKernelProcessContext(KernelProcess process, Kernel kernel)
+    {
+        Verify.NotNull(process);
+        Verify.NotNullOrWhiteSpace(process.State?.Name);
+        Verify.NotNull(kernel);
+
+        if (string.IsNullOrWhiteSpace(process.State.Id))
+        {
+            process = process with { State = process.State with { Id = Guid.NewGuid().ToString() } };
+        }
+
+        this._process = process;
+        this._kernel = kernel;
+        var processId = new ActorId(process.State.Id);
+        this._daprProcess = ActorProxy.Create<IProcess>(processId, "ProcessActor");
+    }
+
+    internal async Task StartWithEventAsync(KernelProcessEvent initialEvent, Kernel? kernel = null)
+    {
+        await this._daprProcess.InitializeProcessAsync(this._process, null).ConfigureAwait(false);
+        await this._daprProcess.RunOnceAsync(initialEvent).ConfigureAwait(false);
+    }
+}

@@ -25,9 +25,9 @@ internal class ExternalEventQueueActor : Actor, IExternalEventQueue
         return Task.FromResult(items);
     }
 
-    public ValueTask EnqueueAsync(KernelProcessEvent externalEvent)
+    public Task EnqueueAsync(KernelProcessEvent externalEvent)
     {
         this._queue.Enqueue(externalEvent);
-        return ValueTask.CompletedTask;
+        return Task.CompletedTask;
     }
 }

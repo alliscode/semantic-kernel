@@ -7,7 +7,7 @@ using Dapr.Actors;
 namespace Microsoft.SemanticKernel;
 internal interface IExternalEventQueue : IActor
 {
-    ValueTask EnqueueAsync(KernelProcessEvent externalEvent);
+    Task EnqueueAsync(KernelProcessEvent externalEvent);
 
     Task<List<KernelProcessEvent>> DequeueAllAsync();
 }

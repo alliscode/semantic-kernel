@@ -11,7 +11,7 @@ namespace Microsoft.SemanticKernel;
 /// </summary>
 internal interface IEventQueue : IActor
 {
-    ValueTask EnqueueAsync(DaprEvent stepEvent);
+    Task EnqueueAsync(DaprEvent stepEvent);
 
     Task<List<DaprEvent>> DequeueAllAsync();
 }

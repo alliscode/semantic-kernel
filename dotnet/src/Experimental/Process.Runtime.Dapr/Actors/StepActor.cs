@@ -11,7 +11,7 @@ using Microsoft.Extensions.Logging;
 using Dapr.Actors.Runtime;
 using Dapr.Actors;
 
-namespace Microsoft.SemanticKernel.Process.Actors;
+namespace Microsoft.SemanticKernel;
 internal class StepActor : Actor, IStep, IKernelProcessMessageChannel
 {
     /// <summary>
@@ -26,16 +26,16 @@ internal class StepActor : Actor, IStep, IKernelProcessMessageChannel
     private KernelProcessStepInfo? _stepInfo;
     private ILogger? _logger;
     private string? _eventNamespace;
-    protected List<DaprMessage> _incomingMessages = new();
 
-    protected KernelProcessStepState? _stepState;
-    protected readonly ILoggerFactory? LoggerFactory;
-    protected Dictionary<string, List<KernelProcessEdge>>? _outputEdges;
-    protected readonly Dictionary<string, KernelFunction> _functions = [];
-    protected Dictionary<string, Dictionary<string, object?>?>? _inputs = [];
-    protected Dictionary<string, Dictionary<string, object?>?>? _initialInputs = [];
+    internal List<DaprMessage> _incomingMessages = new();
+    internal KernelProcessStepState? _stepState;
+    internal readonly ILoggerFactory? LoggerFactory;
+    internal Dictionary<string, List<KernelProcessEdge>>? _outputEdges;
+    internal readonly Dictionary<string, KernelFunction> _functions = [];
+    internal Dictionary<string, Dictionary<string, object?>?>? _inputs = [];
+    internal Dictionary<string, Dictionary<string, object?>?>? _initialInputs = [];
 
-    protected string? ParentProcessId;
+    internal string? ParentProcessId;
 
     /// <summary>
     /// Represents a step in a process that is running in-process.
@@ -59,7 +59,7 @@ internal class StepActor : Actor, IStep, IKernelProcessMessageChannel
     /// <param name="stepInfo">The <see cref="KernelProcessStepInfo"/> instance describing the step.</param>
     /// <param name="parentProcessId">The Id of the parent process if one exists.</param>
     /// <returns>A <see cref="ValueTask"/></returns>
-    public ValueTask InitializeStepAsync(KernelProcessStepInfo stepInfo, string? parentProcessId)
+    public Task InitializeStepAsync(KernelProcessStepInfo stepInfo, string? parentProcessId)
     {
         this.ParentProcessId = parentProcessId;
         this._stepInfo = stepInfo;
@@ -125,7 +125,7 @@ internal class StepActor : Actor, IStep, IKernelProcessMessageChannel
     /// <param name="message">The message to process.</param>
     /// <returns>A <see cref="Task"/></returns>
     /// <exception cref="KernelException"></exception>
-    protected virtual async Task HandleMessageAsync(DaprMessage message)
+    internal virtual async Task HandleMessageAsync(DaprMessage message)
     {
         Verify.NotNull(message);
 
@@ -375,7 +375,7 @@ internal class StepActor : Actor, IStep, IKernelProcessMessageChannel
     /// Emits an event from the step.
     /// </summary>
     /// <param name="daprEvent">The event to emit.</param>
-    protected void EmitEvent(DaprEvent daprEvent)
+    internal void EmitEvent(DaprEvent daprEvent)
     {
         var scopedEvent = this.ScopedEvent(daprEvent);
         this._outgoingEventQueue.Enqueue(scopedEvent);
@@ -386,7 +386,7 @@ internal class StepActor : Actor, IStep, IKernelProcessMessageChannel
     /// </summary>
     /// <param name="daprEvent">The event.</param>
     /// <returns>A <see cref="DaprEvent"/> with the correctly scoped namespace.</returns>
-    protected DaprEvent ScopedEvent(DaprEvent daprEvent)
+    internal DaprEvent ScopedEvent(DaprEvent daprEvent)
     {
         Verify.NotNull(daprEvent);
         return daprEvent with { Namespace = $"{this.Name}_{this.Id}" };
@@ -397,7 +397,7 @@ internal class StepActor : Actor, IStep, IKernelProcessMessageChannel
     /// </summary>
     /// <param name="processEvent">The event.</param>
     /// <returns>A <see cref="DaprEvent"/> with the correctly scoped namespace.</returns>
-    protected DaprEvent ScopedEvent(KernelProcessEvent processEvent)
+    internal DaprEvent ScopedEvent(KernelProcessEvent processEvent)
     {
         Verify.NotNull(processEvent);
         return DaprEvent.FromKernelProcessEvent(processEvent, $"{this.Name}_{this.Id}");

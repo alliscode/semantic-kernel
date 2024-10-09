@@ -11,7 +11,7 @@ namespace Microsoft.SemanticKernel;
 /// </summary>
 internal interface IMessageQueue : IActor
 {
-    ValueTask EnqueueAsync(DaprMessage message);
+    Task EnqueueAsync(DaprMessage message);
 
     Task<List<DaprMessage>> DequeueAllAsync();
 }

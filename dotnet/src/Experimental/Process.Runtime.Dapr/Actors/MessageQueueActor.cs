@@ -5,7 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Dapr.Actors.Runtime;
 
-namespace Microsoft.SemanticKernel.Process.Actors;
+namespace Microsoft.SemanticKernel;
 
 /// <summary>
 /// An actor that represents a message queue.
@@ -25,9 +25,9 @@ internal class MessageQueueActor : Actor, IMessageQueue
         return Task.FromResult(items);
     }
 
-    public ValueTask EnqueueAsync(DaprMessage message)
+    public Task EnqueueAsync(DaprMessage message)
     {
         this._queue.Enqueue(message);
-        return ValueTask.CompletedTask;
+        return Task.CompletedTask;
     }
 }

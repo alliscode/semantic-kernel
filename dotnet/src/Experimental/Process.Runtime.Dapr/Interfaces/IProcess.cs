@@ -8,17 +8,17 @@ namespace Microsoft.SemanticKernel;
 /// <summary>
 /// An interface that represents a process.
 /// </summary>
-internal interface IProcess : IActor
+public interface IProcess : IActor
 {
-    ValueTask InitializeProcessAsync(KernelProcess process, string? parentProcessId);
+    Task InitializeProcessAsync(KernelProcess process, string? parentProcessId);
 
-    Task StartAsync(Kernel? kernel = null, bool keepAlive = true);
+    Task StartAsync(bool keepAlive);
 
-    Task RunOnceAsync(KernelProcessEvent? processEvent, Kernel? kernel = null);
+    Task RunOnceAsync(KernelProcessEvent processEvent);
 
     Task StopAsync();
 
-    Task SendMessageAsync(KernelProcessEvent processEvent, Kernel? kernel = null);
+    Task SendMessageAsync(KernelProcessEvent processEvent);
 
     Task<KernelProcess> GetProcessInfoAsync();
 }

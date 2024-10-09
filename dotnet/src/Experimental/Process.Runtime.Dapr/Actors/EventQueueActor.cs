@@ -5,7 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Dapr.Actors.Runtime;
 
-namespace Microsoft.SemanticKernel.Process.Actors;
+namespace Microsoft.SemanticKernel;
 
 /// <summary>
 /// An actor that represents an event queue.
@@ -25,9 +25,9 @@ internal class EventQueueActor : Actor, IEventQueue
         return Task.FromResult(items);
     }
 
-    public ValueTask EnqueueAsync(DaprEvent stepEvent)
+    public Task EnqueueAsync(DaprEvent stepEvent)
     {
         this._queue.Enqueue(stepEvent);
-        return ValueTask.CompletedTask;
+        return Task.CompletedTask;
     }
 }
