@@ -6,6 +6,8 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 
+builder.Services.AddLogging();
+
 builder.Services.AddKernel();
 
 builder.Services.AddActors(options =>

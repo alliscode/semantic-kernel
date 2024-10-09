@@ -9,7 +9,7 @@ namespace Microsoft.SemanticKernel;
 /// <summary>
 /// An interface for a message queue.
 /// </summary>
-internal interface IMessageQueue : IActor
+public interface IMessageQueue : IActor
 {
     Task EnqueueAsync(DaprMessage message);
 

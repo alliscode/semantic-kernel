@@ -35,7 +35,8 @@ public class DaprKernelProcessContext
 
     internal async Task StartWithEventAsync(KernelProcessEvent initialEvent, Kernel? kernel = null)
     {
-        await this._daprProcess.InitializeProcessAsync(this._process, null).ConfigureAwait(false);
+        var daprProcess = DaprProcessInfo.FromKernelProcess(this._process);
+        await this._daprProcess.InitializeProcessAsync(daprProcess, null).ConfigureAwait(false);
         await this._daprProcess.RunOnceAsync(initialEvent).ConfigureAwait(false);
     }
 }

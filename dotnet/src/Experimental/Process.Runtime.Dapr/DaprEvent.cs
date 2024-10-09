@@ -1,17 +1,17 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
 namespace Microsoft.SemanticKernel;
-internal record DaprEvent
+public record DaprEvent
 {
     /// <summary>
     /// The inner <see cref="KernelProcessEvent"/> that this <see cref="DaprEvent"/> wraps.
     /// </summary>
-    internal required KernelProcessEvent InnerEvent { get; init; }
+    public required KernelProcessEvent InnerEvent { get; init; }
 
     /// <summary>
     /// The namespace of the event.
     /// </summary>
-    internal required string? Namespace { get; init; }
+    public required string? Namespace { get; init; }
 
     /// <summary>
     /// The Id of the event.

@@ -10,11 +10,11 @@ namespace Microsoft.SemanticKernel;
 /// </summary>
 public interface IStep : IActor
 {
-    Task InitializeStepAsync(KernelProcessStepInfo stepInfo, string? parentProcessId);
+    Task InitializeStepAsync(DaprStepInfo stepInfo, string? parentProcessId);
 
     Task<int> PrepareIncomingMessagesAsync();
 
     Task ProcessIncomingMessagesAsync();
 
-    Task<KernelProcessStepInfo> ToKernelProcessStepInfoAsync();
+    Task<DaprStepInfo> ToDaprStepInfoAsync();
 }

@@ -1,10 +1,13 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
+using System.Runtime.Serialization;
+
 namespace Microsoft.SemanticKernel;
 
 /// <summary>
 /// Represents the state of a process.
 /// </summary>
+[DataContract]
 public sealed record KernelProcessState : KernelProcessStepState
 {
     /// <summary>

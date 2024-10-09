@@ -9,7 +9,7 @@ namespace Microsoft.SemanticKernel;
 /// <summary>
 /// An interface for an event queue.
 /// </summary>
-internal interface IEventQueue : IActor
+public interface IEventQueue : IActor
 {
     Task EnqueueAsync(DaprEvent stepEvent);
 

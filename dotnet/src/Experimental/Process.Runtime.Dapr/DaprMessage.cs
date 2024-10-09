@@ -10,31 +10,27 @@ namespace Microsoft.SemanticKernel;
 /// <remarks>
 /// Initializes a new instance of the <see cref="DaprMessage"/> class.
 /// </remarks>
-/// <param name="sourceId">The source identifier of the message.</param>
-/// <param name="destinationId">The destination identifier of the message.</param>
-/// <param name="functionName">The name of the function associated with the message.</param>
-/// <param name="values">The dictionary of values associated with the message.</param>
-internal record DaprMessage(string sourceId, string destinationId, string functionName, Dictionary<string, object?> values)
+public record DaprMessage
 {
     /// <summary>
     /// Gets the source identifier of the message.
     /// </summary>
-    public string SourceId { get; } = sourceId;
+    public required string SourceId { get; init; }
 
     /// <summary>
     /// Gets the destination identifier of the message.
     /// </summary>
-    public string DestinationId { get; } = destinationId;
+    public required string DestinationId { get; init; }
 
     /// <summary>
     /// Gets the name of the function associated with the message.
     /// </summary>
-    public string FunctionName { get; } = functionName;
+    public required string FunctionName { get; init; }
 
     /// <summary>
     /// Gets the dictionary of values associated with the message.
     /// </summary>
-    public Dictionary<string, object?> Values { get; } = values;
+    public required Dictionary<string, object?> Values { get; init; }
 
     /// <summary>
     /// The Id of the target event. This may be null if the message is not targeting a sub-process.

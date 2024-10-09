@@ -1,10 +1,13 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
+using System.Runtime.Serialization;
+
 namespace Microsoft.SemanticKernel;
 
 /// <summary>
 /// A serializable representation of a specific parameter of a specific function of a specific Step.
 /// </summary>
+[DataContract]
 public record KernelProcessFunctionTarget
 {
     /// <summary>

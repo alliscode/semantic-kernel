@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 using Dapr.Actors;
 
 namespace Microsoft.SemanticKernel;
-internal interface IExternalEventQueue : IActor
+public interface IExternalEventQueue : IActor
 {
     Task EnqueueAsync(KernelProcessEvent externalEvent);
 

@@ -23,9 +23,10 @@ internal class StepActor : Actor, IStep, IKernelProcessMessageChannel
     private readonly Queue<DaprEvent> _outgoingEventQueue = new();
     private readonly Lazy<ValueTask> _activateTask;
 
-    private KernelProcessStepInfo? _stepInfo;
+    private DaprStepInfo? _stepInfo;
     private ILogger? _logger;
     private string? _eventNamespace;
+    private Type? _innerStepType;
 
     internal List<DaprMessage> _incomingMessages = new();
     internal KernelProcessStepState? _stepState;
@@ -59,20 +60,27 @@ internal class StepActor : Actor, IStep, IKernelProcessMessageChannel
     /// <param name="stepInfo">The <see cref="KernelProcessStepInfo"/> instance describing the step.</param>
     /// <param name="parentProcessId">The Id of the parent process if one exists.</param>
     /// <returns>A <see cref="ValueTask"/></returns>
-    public Task InitializeStepAsync(KernelProcessStepInfo stepInfo, string? parentProcessId)
+    public Task InitializeStepAsync(DaprStepInfo stepInfo, string? parentProcessId)
     {
+        // attempt to load the inner step type
+        this._innerStepType = Type.GetType(stepInfo.InnerStepDotnetType);
+        if (this._innerStepType is null)
+        {
+            throw new KernelException($"Could not load the inner step type '{stepInfo.InnerStepDotnetType}'.");
+        }
+
         this.ParentProcessId = parentProcessId;
         this._stepInfo = stepInfo;
         this._stepState = stepInfo.State;
-        this._logger = this.LoggerFactory?.CreateLogger(this._stepInfo.InnerStepType) ?? new NullLogger<StepActor>();
+        this._logger = this.LoggerFactory?.CreateLogger(this._innerStepType) ?? new NullLogger<StepActor>();
         this._outputEdges = this._stepInfo.Edges.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToList());
         this._eventNamespace = $"{this._stepInfo.State.Name}_{this._stepInfo.State.Id}";
-        return default;
+        return Task.CompletedTask;
     }
 
     public async Task<int> PrepareIncomingMessagesAsync()
     {
-        var messageQueue = this.ProxyFactory.CreateActorProxy<IMessageQueue>(new ActorId(this.Id.GetId()), nameof(IMessageQueue));
+        var messageQueue = this.ProxyFactory.CreateActorProxy<IMessageQueue>(new ActorId(this.Id.GetId()), nameof(MessageQueueActor));
         this._incomingMessages = await messageQueue.DequeueAllAsync().ConfigureAwait(false);
         return this._incomingMessages.Count;
     }
@@ -90,13 +98,13 @@ internal class StepActor : Actor, IStep, IKernelProcessMessageChannel
     /// Extracts the current state of the step and returns it as a <see cref="KernelProcessStepInfo"/>.
     /// </summary>
     /// <returns>An instance of <see cref="KernelProcessStepInfo"/></returns>
-    public virtual async Task<KernelProcessStepInfo> ToKernelProcessStepInfoAsync()
+    public virtual async Task<DaprStepInfo> ToDaprStepInfoAsync()
     {
         // Lazy one-time initialization of the step before extracting state information.
         // This allows state information to be extracted even if the step has not been activated.
         await this._activateTask.Value.ConfigureAwait(false);
 
-        var stepInfo = new KernelProcessStepInfo(this._stepInfo!.InnerStepType, this._stepState!, this._outputEdges!);
+        var stepInfo = new DaprStepInfo { InnerStepDotnetType = this._stepInfo!.InnerStepDotnetType!, State = this._stepInfo.State, Edges = this._stepInfo.Edges! };
         return stepInfo;
     }
 
@@ -218,13 +226,13 @@ internal class StepActor : Actor, IStep, IKernelProcessMessageChannel
     {
         if (this._stepInfo is null)
         {
-            var errorMessage = "A step cannot be activated before it hasbeen initialized.";
+            var errorMessage = "A step cannot be activated before it has been initialized.";
             this._logger?.LogError("{ErrorMessage}", errorMessage);
             throw new KernelException(errorMessage);
         }
 
         // Instantiate an instance of the inner step object
-        KernelProcessStep stepInstance = (KernelProcessStep)ActivatorUtilities.CreateInstance(this._kernel.Services, this._stepInfo.InnerStepType);
+        KernelProcessStep stepInstance = (KernelProcessStep)ActivatorUtilities.CreateInstance(this._kernel.Services, this._innerStepType!);
         var kernelPlugin = KernelPluginFactory.CreateFromObject(stepInstance, pluginName: this._stepInfo.State.Name!);
 
         // Load the kernel functions
@@ -241,7 +249,7 @@ internal class StepActor : Actor, IStep, IKernelProcessMessageChannel
         KernelProcessStepState? stateObject = null;
         Type? stateType = null;
 
-        if (TryGetSubtypeOfStatefulStep(this._stepInfo.InnerStepType, out Type? genericStepType) && genericStepType is not null)
+        if (TryGetSubtypeOfStatefulStep(this._innerStepType, out Type? genericStepType) && genericStepType is not null)
         {
             // The step is a subclass of KernelProcessStep<>, so we need to extract the generic type argument
             // and create an instance of the corresponding KernelProcessStepState<>.
@@ -277,7 +285,7 @@ internal class StepActor : Actor, IStep, IKernelProcessMessageChannel
             throw new KernelException(errorMessage);
         }
 
-        MethodInfo? methodInfo = this._stepInfo.InnerStepType.GetMethod(nameof(KernelProcessStep.ActivateAsync), [stateType]);
+        MethodInfo? methodInfo = this._innerStepType!.GetMethod(nameof(KernelProcessStep.ActivateAsync), [stateType]);
 
         if (methodInfo is null)
         {

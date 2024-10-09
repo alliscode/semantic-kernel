@@ -1,0 +1,53 @@
+// Copyright (c) Microsoft. All rights reserved.
+
+using System.Collections.Generic;
+using System.Runtime.Serialization;
+
+namespace Microsoft.SemanticKernel;
+
+/// <summary>
+/// A serializable representation of a Dapr Process.
+/// </summary>
+[KnownType(typeof(KernelProcessEdge))]
+[KnownType(typeof(KernelProcessState))]
+[KnownType(typeof(KernelProcessStepState))]
+public sealed record DaprProcessInfo : DaprStepInfo
+{
+    /// <summary>
+    /// The collection of Steps in the Process.
+    /// </summary>
+    public required IList<DaprStepInfo> Steps { get; init; }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="DaprProcessInfo"/> class from an instance of <see cref="KernelProcess"/>.
+    /// </summary>
+    /// <param name="kernelProcess">The <see cref="KernelProcess"/> used to build the <see cref="DaprProcessInfo"/></param>
+    /// <returns>An instance of <see cref="DaprProcessInfo"/></returns>
+    public static DaprProcessInfo FromKernelProcess(KernelProcess kernelProcess)
+    {
+        Verify.NotNull(kernelProcess);
+
+        DaprStepInfo daprStepInfo = DaprStepInfo.FromKernelStepInfo(kernelProcess);
+        List<DaprStepInfo> daprSteps = [];
+
+        foreach (var step in kernelProcess.Steps)
+        {
+            if (step is KernelProcess kernelStep)
+            {
+                daprSteps.Add(DaprProcessInfo.FromKernelProcess(kernelStep));
+            }
+            else
+            {
+                daprSteps.Add(DaprStepInfo.FromKernelStepInfo(step));
+            }
+        }
+
+        return new DaprProcessInfo
+        {
+            InnerStepDotnetType = daprStepInfo.InnerStepDotnetType,
+            State = daprStepInfo.State,
+            Edges = daprStepInfo.Edges,
+            Steps = daprSteps,
+        };
+    }
+}

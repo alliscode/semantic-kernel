@@ -24,8 +24,12 @@ internal static class DaprMessageFactory
             parameterValue.Add(target.ParameterName!, data);
         }
 
-        DaprMessage newMessage = new(edge.SourceStepId, target.StepId, target.FunctionName, parameterValue)
+        DaprMessage newMessage = new()
         {
+            SourceId = edge.SourceStepId,
+            DestinationId = target.StepId,
+            FunctionName = target.FunctionName,
+            Values = parameterValue,
             TargetEventId = target.TargetEventId,
             TargetEventData = data
         };

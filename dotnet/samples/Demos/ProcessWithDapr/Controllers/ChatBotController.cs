@@ -23,6 +23,12 @@ public class ChatBotController : ControllerBase
         this._kernel = kernel;
     }
 
+    /// <summary>
+    /// Post a message to a chat bot.
+    /// </summary>
+    /// <param name="chatBotId">The Id of the chat bot.</param>
+    /// <param name="message">The message to send.</param>
+    /// <returns></returns>
     [HttpGet("chatbots/{chatBotId}/{message}")]
     public async Task<IActionResult> PostAsync(string chatBotId, string message)
     {

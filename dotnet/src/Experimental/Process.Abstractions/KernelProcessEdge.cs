@@ -1,10 +1,14 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
+using System.Runtime.Serialization;
+
 namespace Microsoft.SemanticKernel;
 
 /// <summary>
 /// A serializable representation of an edge between a source <see cref="KernelProcessStep"/> and a <see cref="KernelProcessFunctionTarget"/>.
 /// </summary>
+[DataContract]
+[KnownType(typeof(KernelProcessFunctionTarget))]
 public sealed class KernelProcessEdge
 {
     /// <summary>
