@@ -1,5 +1,6 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
+using System.Runtime.Serialization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.SemanticKernel;
 
@@ -102,6 +103,7 @@ public class ChatBotController : ControllerBase
         [KernelFunction(Functions.KickOff)]
         public async ValueTask PrintWelcomeMessageAsync(KernelProcessStepContext context)
         {
+            Console.WriteLine("##### Kickoff ran.");
             await context.EmitEventAsync(new() { Id = CommonEvents.StartARequested, Data = "Get Going A" });
             await context.EmitEventAsync(new() { Id = CommonEvents.StartBRequested, Data = "Get Going B" });
         }
@@ -115,8 +117,9 @@ public class ChatBotController : ControllerBase
         [KernelFunction]
         public async ValueTask DoItAsync(KernelProcessStepContext context)
         {
+            Console.WriteLine("##### AStep ran.");
             await Task.Delay(TimeSpan.FromSeconds(1));
-            await context.EmitEventAsync(new() { Id = CommonEvents.AStepDone });
+            await context.EmitEventAsync(new() { Id = CommonEvents.AStepDone, Data = "I did A" });
         }
     }
 
@@ -128,37 +131,50 @@ public class ChatBotController : ControllerBase
         [KernelFunction]
         public async ValueTask DoItAsync(KernelProcessStepContext context)
         {
+            Console.WriteLine("##### BStep ran.");
             await Task.Delay(TimeSpan.FromSeconds(2));
-            await context.EmitEventAsync(new() { Id = CommonEvents.BStepDone });
+            await context.EmitEventAsync(new() { Id = CommonEvents.BStepDone, Data = "I did B" });
         }
     }
 
     /// <summary>
     /// A step in the process.
     /// </summary>
-    private sealed class CStep : KernelProcessStep
+    private sealed class CStep : KernelProcessStep<CStepState>
     {
-        private int CurrentCycle { get; set; } = 0;
+        private readonly CStepState _state = new();
 
-        public CStep()
+        public override ValueTask ActivateAsync(KernelProcessStepState<CStepState> state)
         {
-            this.CurrentCycle = 0;
+            state.State = this._state;
+            return base.ActivateAsync(state);
         }
 
         [KernelFunction]
         public async ValueTask DoItAsync(KernelProcessStepContext context, string astepdata, string bstepdata)
         {
-            this.CurrentCycle++;
-            if (this.CurrentCycle == 3)
+            this._state.CurrentCycle++;
+            if (this._state.CurrentCycle == 3)
             {
                 // Exit the processes
+                Console.WriteLine("##### CStep run cycle 3 - exiting.");
                 await context.EmitEventAsync(new() { Id = CommonEvents.ExitRequested });
                 return;
             }
 
             // Cycle back to the start
+            Console.WriteLine($"##### CStep run cycle {this._state.CurrentCycle}.");
             await context.EmitEventAsync(new() { Id = CommonEvents.CStepDone });
         }
+    }
+
+    /// <summary>
+    /// A state object for the CStep.
+    /// </summary>
+    [DataContract]
+    private sealed record CStepState
+    {
+        public int CurrentCycle { get; set; }
     }
 
     /// <summary>

@@ -21,5 +21,11 @@ public static class KernelProcessDaprExtensions
         actorOptions.Actors.RegisterActor<Microsoft.SemanticKernel.EventQueueActor>();
         actorOptions.Actors.RegisterActor<Microsoft.SemanticKernel.MessageQueueActor>();
         actorOptions.Actors.RegisterActor<Microsoft.SemanticKernel.ExternalEventQueueActor>();
+
+        // actorOptions.ReentrancyConfig = new Dapr.Actors.ActorReentrancyConfig()
+        // {
+        //     Enabled = true,
+        //     MaxStackDepth = 32
+        // };
     }
 }

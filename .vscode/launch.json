@@ -52,7 +52,7 @@
       "request": "launch",
       "projectPath": "${workspaceFolder}\\dotnet\\samples\\Demos\\ProcessWithDapr\\ProcessWithDapr.csproj",
       "preLaunchTask": "daprd-debug",
-      "postDebugTask": "daprd-down"
+      "postDebugTask": "dapr-down"
     }
   ]
 }

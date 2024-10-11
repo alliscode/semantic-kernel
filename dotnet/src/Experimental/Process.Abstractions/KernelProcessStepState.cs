@@ -1,5 +1,7 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
+using System;
+using System.Collections.Generic;
 using System.Runtime.Serialization;
 
 namespace Microsoft.SemanticKernel;
@@ -8,8 +10,13 @@ namespace Microsoft.SemanticKernel;
 /// Represents the state of an individual step in a process.
 /// </summary>
 [DataContract]
+[KnownType(nameof(GetKnownTypes))]
 public record KernelProcessStepState
 {
+    private readonly static HashSet<Type> s_knownTypes = [];
+
+    private static HashSet<Type> GetKnownTypes() => s_knownTypes;
+
     /// <summary>
     /// The identifier of the Step which is required to be unique within an instance of a Process.
     /// This may be null until a process containing this step has been invoked.
@@ -36,6 +43,11 @@ public record KernelProcessStepState
         this.Id = id;
         this.Name = name;
     }
+
+    public static void RegisterDerivedType(Type derivedType)
+    {
+        s_knownTypes.Add(derivedType);
+    }
 }
 
 /// <summary>
@@ -48,6 +60,7 @@ public sealed record KernelProcessStepState<TState> : KernelProcessStepState whe
     /// <summary>
     /// The user-defined state object associated with the Step.
     /// </summary>
+    [DataMember]
     public TState? State { get; set; }
 
     /// <summary>

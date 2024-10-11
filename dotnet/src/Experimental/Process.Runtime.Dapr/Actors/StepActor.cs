@@ -122,9 +122,7 @@ internal class StepActor : Actor, IStep, IKernelProcessMessageChannel
     /// <returns>A <see cref="ValueTask"/></returns>
     public ValueTask EmitEventAsync(KernelProcessEvent processEvent)
     {
-        // TODO: Implement KernelProcessEventChannel
-        this.EmitEvent(DaprEvent.FromKernelProcessEvent(processEvent, this._eventNamespace!));
-        return default;
+        return this.EmitEventAsync(DaprEvent.FromKernelProcessEvent(processEvent, this._eventNamespace!));
     }
 
     /// <summary>
@@ -172,7 +170,7 @@ internal class StepActor : Actor, IStep, IKernelProcessMessageChannel
         if (invocableFunctions.Count == 0)
         {
             string missingKeysLog() => string.Join(", ", missingKeys.Select(k => $"{k.Key}: {string.Join(", ", k.Value?.Where(v => v.Value == null).Select(v => v.Key) ?? [])}"));
-            this._logger?.LogDebug("No invocable functions, missing keys: {MissingKeys}", missingKeysLog());
+            this._logger?.LogInformation("No invocable functions, missing keys: {MissingKeys}", missingKeysLog());
             return;
         }
 
@@ -180,7 +178,7 @@ internal class StepActor : Actor, IStep, IKernelProcessMessageChannel
         var targetFunction = invocableFunctions.FirstOrDefault((name) => name == message.FunctionName) ??
             throw new InvalidOperationException($"A message targeting function '{message.FunctionName}' has resulted in a function named '{invocableFunctions.First()}' becoming invocable. Are the function names configured correctly?");
 
-        this._logger?.LogDebug("Step with Id `{StepId}` received all required input for function [{TargetFunction}] and is executing.", this.Name, targetFunction);
+        this._logger?.LogInformation("Step with Id `{StepId}` received all required input for function [{TargetFunction}] and is executing.", this.Name, targetFunction);
 
         // Concat all the inputs and run the function
         KernelArguments arguments = new(this._inputs[targetFunction]!);
@@ -197,13 +195,16 @@ internal class StepActor : Actor, IStep, IKernelProcessMessageChannel
 #pragma warning disable CA1031 // Do not catch general exception types
         try
         {
+            this?._logger?.LogInformation("Invoking function {FunctionName} with arguments {Arguments}", targetFunction, arguments);
             invokeResult = await this.InvokeFunction(function, this._kernel, arguments).ConfigureAwait(false);
+
+            this?.Logger?.LogInformation("Function {FunctionName} returned {Result}", targetFunction, invokeResult);
             eventName = $"{targetFunction}.OnResult";
             eventValue = invokeResult?.GetValue<object>();
         }
         catch (Exception ex)
         {
-            this._logger?.LogError("Error in Step {StepName}: {ErrorMessage}", this.Name, ex.Message);
+            this._logger?.LogInformation("Error in Step {StepName}: {ErrorMessage}", this.Name, ex.Message);
             eventName = $"{targetFunction}.OnError";
             eventValue = ex.Message;
         }
@@ -269,7 +270,7 @@ internal class StepActor : Actor, IStep, IKernelProcessMessageChannel
                 throw new KernelException(errorMessage);
             }
 
-            stateObject = (KernelProcessStepState?)Activator.CreateInstance(stateType, this.Name, this.Id);
+            stateObject = (KernelProcessStepState?)Activator.CreateInstance(stateType, this.Name, this.Id.GetId());
         }
         else
         {
@@ -383,10 +384,28 @@ internal class StepActor : Actor, IStep, IKernelProcessMessageChannel
     /// Emits an event from the step.
     /// </summary>
     /// <param name="daprEvent">The event to emit.</param>
-    internal void EmitEvent(DaprEvent daprEvent)
+    internal async ValueTask EmitEventAsync(DaprEvent daprEvent)
     {
         var scopedEvent = this.ScopedEvent(daprEvent);
-        this._outgoingEventQueue.Enqueue(scopedEvent);
+
+        // Emit the event out of the process (this one) if it's visibility is public.
+        if (daprEvent.Visibility == KernelProcessEventVisibility.Public)
+        {
+            if (this.ParentProcessId is not null)
+            {
+                // Emit the event to the parent process
+                var parentProcess = this.ProxyFactory.CreateActorProxy<IEventQueue>(new ActorId(this.ParentProcessId), nameof(EventQueueActor));
+                await parentProcess.EnqueueAsync(scopedEvent).ConfigureAwait(false);
+            }
+        }
+
+        // Get the edges for the event and queue up the messages to be sent to the next steps.
+        foreach (var edge in this.GetEdgeForEvent(daprEvent.Id!))
+        {
+            DaprMessage message = DaprMessageFactory.CreateFromEdge(edge, daprEvent.Data);
+            var targetStep = this.ProxyFactory.CreateActorProxy<IMessageQueue>(new ActorId(edge.OutputTarget.StepId), nameof(MessageQueueActor));
+            await targetStep.EnqueueAsync(message).ConfigureAwait(false);
+        }
     }
 
     /// <summary>
@@ -409,5 +428,25 @@ internal class StepActor : Actor, IStep, IKernelProcessMessageChannel
     {
         Verify.NotNull(processEvent);
         return DaprEvent.FromKernelProcessEvent(processEvent, $"{this.Name}_{this.Id}");
+    }
+
+    /// <summary>
+    /// Retrieves all edges that are associated with the provided event Id.
+    /// </summary>
+    /// <param name="eventId">The event Id of interest.</param>
+    /// <returns>A <see cref="IEnumerable{T}"/> where T is <see cref="KernelProcessEdge"/></returns>
+    internal IEnumerable<KernelProcessEdge> GetEdgeForEvent(string eventId)
+    {
+        if (this._outputEdges is null)
+        {
+            return [];
+        }
+
+        if (this._outputEdges.TryGetValue(eventId, out List<KernelProcessEdge>? edges) && edges is not null)
+        {
+            return edges;
+        }
+
+        return [];
     }
 }

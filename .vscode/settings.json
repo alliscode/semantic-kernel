@@ -71,7 +71,8 @@
     "Prompty",
     "SKEXP",
     "superstep",
-    "Supersteps"
+    "Supersteps",
+    "uninstantiated"
   ],
   "[java]": {
     "editor.formatOnSave": false,
