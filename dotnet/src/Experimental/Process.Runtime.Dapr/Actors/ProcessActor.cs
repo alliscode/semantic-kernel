@@ -15,6 +15,7 @@ using Dapr.Actors;
 namespace Microsoft.SemanticKernel;
 internal class ProcessActor : StepActor, IProcess, IDisposable
 {
+    private const string DaprProcessInfoStateName = "DaprProcessInfo";
     private const string EndStepId = "Microsoft.SemanticKernel.Process.EndStep";
     private readonly JoinableTaskFactory _joinableTaskFactory;
     private readonly JoinableTaskContext _joinableTaskContext;
@@ -47,13 +48,36 @@ internal class ProcessActor : StepActor, IProcess, IDisposable
 
     #region Public Actor Methods
 
-    public async Task InitializeProcessAsync(DaprProcessInfo process, string? parentProcessId)
+    public async Task InitializeProcessAsync(DaprProcessInfo processInfo, string? parentProcessId)
     {
-        Verify.NotNull(process);
-        Verify.NotNull(process.Steps);
+        Verify.NotNull(processInfo);
+        Verify.NotNull(processInfo.Steps);
 
-        this._stepsInfos = new List<DaprStepInfo>(process.Steps);
-        this._process = process;
+        // Only initialize once. This check is required as the actor can be re-activated from persisted state and
+        // this should not result in multiple initializations.
+        if (this._isInitialized)
+        {
+            return;
+        }
+
+        // Initialize the process
+        await this.Int_InitializeProcessAsync(processInfo, parentProcessId).ConfigureAwait(false);
+
+        // Save the state
+        await this.StateManager.AddStateAsync(DaprProcessInfoStateName, processInfo).ConfigureAwait(false);
+        await this.StateManager.AddStateAsync("parentProcessId", parentProcessId).ConfigureAwait(false);
+        await this.StateManager.AddStateAsync("kernelStepActivated", true).ConfigureAwait(false);
+        await this.StateManager.SaveStateAsync().ConfigureAwait(false);
+    }
+
+    public async Task Int_InitializeProcessAsync(DaprProcessInfo processInfo, string? parentProcessId)
+    {
+        Verify.NotNull(processInfo);
+        Verify.NotNull(processInfo.Steps);
+
+        this.ParentProcessId = parentProcessId;
+        this._process = processInfo;
+        this._stepsInfos = new List<DaprStepInfo>(this._process.Steps);
         this._logger = this.LoggerFactory?.CreateLogger(this._process.State.Name) ?? new NullLogger<StepActor>();
 
         // Initialize the input and output edges for the process
@@ -190,6 +214,21 @@ internal class ProcessActor : StepActor, IProcess, IDisposable
         return await this.ToDaprProcessInfoAsync().ConfigureAwait(false);
     }
 
+    protected override async Task OnActivateAsync()
+    {
+        var existingProcessInfo = await this.StateManager.TryGetStateAsync<DaprProcessInfo>(DaprProcessInfoStateName).ConfigureAwait(false);
+        if (existingProcessInfo.HasValue)
+        {
+            this.ParentProcessId = await this.StateManager.GetStateAsync<string>("parentProcessId").ConfigureAwait(false);
+            await this.Int_InitializeProcessAsync(existingProcessInfo.Value, this.ParentProcessId).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// The name of the step.
+    /// </summary>
+    protected override string Name => this._process?.State.Name ?? throw new KernelException("The Process must be initialized before accessing the Name property.");
+
     #endregion
 
     /// <summary>
@@ -205,7 +244,7 @@ internal class ProcessActor : StepActor, IProcess, IDisposable
         if (string.IsNullOrWhiteSpace(message.TargetEventId))
         {
             string errorMessage = "Internal Process Error: The target event id must be specified when sending a message to a step.";
-            this._logger.LogError("{ErrorMessage}", errorMessage);
+            this._logger?.LogError("{ErrorMessage}", errorMessage);
             throw new KernelException(errorMessage);
         }
 

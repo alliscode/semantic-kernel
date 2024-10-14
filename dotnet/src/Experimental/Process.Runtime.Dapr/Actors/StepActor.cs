@@ -14,19 +14,22 @@ using Dapr.Actors;
 namespace Microsoft.SemanticKernel;
 internal class StepActor : Actor, IStep, IKernelProcessMessageChannel
 {
+    private const string DaprStepInfoStateName = "DaprStepInfo";
+
     /// <summary>
     /// The generic state type for a process step.
     /// </summary>
     private static readonly Type s_genericType = typeof(KernelProcessStep<>);
 
     private readonly Kernel _kernel;
-    private readonly Queue<DaprEvent> _outgoingEventQueue = new();
     private readonly Lazy<ValueTask> _activateTask;
 
     private DaprStepInfo? _stepInfo;
     private ILogger? _logger;
     private string? _eventNamespace;
     private Type? _innerStepType;
+
+    private bool _isInitialized;
 
     internal List<DaprMessage> _incomingMessages = new();
     internal KernelProcessStepState? _stepState;
@@ -60,9 +63,36 @@ internal class StepActor : Actor, IStep, IKernelProcessMessageChannel
     /// <param name="stepInfo">The <see cref="KernelProcessStepInfo"/> instance describing the step.</param>
     /// <param name="parentProcessId">The Id of the parent process if one exists.</param>
     /// <returns>A <see cref="ValueTask"/></returns>
-    public Task InitializeStepAsync(DaprStepInfo stepInfo, string? parentProcessId)
+    public async Task InitializeStepAsync(DaprStepInfo stepInfo, string? parentProcessId)
     {
-        // attempt to load the inner step type
+        Verify.NotNull(stepInfo);
+
+        // Only initialize once. This check is required as the actor can be re-activated from persisted state and
+        // this should not result in multiple initializations.
+        if (this._isInitialized)
+        {
+            return;
+        }
+
+        await this.Int_InitializeStepAsync(stepInfo, parentProcessId).ConfigureAwait(false);
+
+        // Save initial state
+        await this.StateManager.AddStateAsync(DaprStepInfoStateName, stepInfo).ConfigureAwait(false);
+        await this.StateManager.AddStateAsync("parentProcessId", parentProcessId).ConfigureAwait(false);
+        await this.StateManager.SaveStateAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Initializes the step with the provided step information.
+    /// </summary>
+    /// <param name="stepInfo">The <see cref="KernelProcessStepInfo"/> instance describing the step.</param>
+    /// <param name="parentProcessId">The Id of the parent process if one exists.</param>
+    /// <returns>A <see cref="ValueTask"/></returns>
+    public Task Int_InitializeStepAsync(DaprStepInfo stepInfo, string? parentProcessId)
+    {
+        Verify.NotNull(stepInfo);
+
+        // Attempt to load the inner step type
         this._innerStepType = Type.GetType(stepInfo.InnerStepDotnetType);
         if (this._innerStepType is null)
         {
@@ -71,10 +101,11 @@ internal class StepActor : Actor, IStep, IKernelProcessMessageChannel
 
         this.ParentProcessId = parentProcessId;
         this._stepInfo = stepInfo;
-        this._stepState = stepInfo.State;
+        this._stepState = this._stepInfo.State;
         this._logger = this.LoggerFactory?.CreateLogger(this._innerStepType) ?? new NullLogger<StepActor>();
         this._outputEdges = this._stepInfo.Edges.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToList());
         this._eventNamespace = $"{this._stepInfo.State.Name}_{this._stepInfo.State.Id}";
+        this._isInitialized = true;
         return Task.CompletedTask;
     }
 
@@ -108,12 +139,31 @@ internal class StepActor : Actor, IStep, IKernelProcessMessageChannel
         return stepInfo;
     }
 
+    protected override async Task OnActivateAsync()
+    {
+        // await this.StateManager.TryRemoveStateAsync("kernelStepActivated").ConfigureAwait(false);
+        // await this.StateManager.SaveStateAsync().ConfigureAwait(false);
+        // If the inner step (KernelProcessStep instance) has already been activated then we call activate here also.
+
+        var existingStepInfo = await this.StateManager.TryGetStateAsync<DaprStepInfo>(DaprStepInfoStateName).ConfigureAwait(false);
+        if (existingStepInfo.HasValue)
+        {
+            var parentProcessId = await this.StateManager.GetStateAsync<string>("parentProcessId").ConfigureAwait(false);
+            await this.Int_InitializeStepAsync(existingStepInfo.Value, parentProcessId).ConfigureAwait(false);
+        }
+    }
+
+    protected override Task OnDeactivateAsync()
+    {
+        return base.OnDeactivateAsync();
+    }
+
     #endregion
 
     /// <summary>
     /// The name of the step.
     /// </summary>
-    protected string Name => this._stepInfo?.State.Name ?? throw new KernelException("The Step must be initialized before accessing the Name property.");
+    protected virtual string Name => this._stepInfo?.State.Name ?? throw new KernelException("The Step must be initialized before accessing the Name property.");
 
     /// <summary>
     /// Emits an event from the step.
@@ -298,6 +348,10 @@ internal class StepActor : Actor, IStep, IKernelProcessMessageChannel
         this._stepState = stateObject;
         methodInfo.Invoke(stepInstance, [stateObject]);
         await stepInstance.ActivateAsync(stateObject).ConfigureAwait(false);
+
+        // Save the state
+        await this.StateManager.TryAddStateAsync("kernelStepActivated", true).ConfigureAwait(false);
+        await this.StateManager.SaveStateAsync().ConfigureAwait(false);
     }
 
     /// <summary>

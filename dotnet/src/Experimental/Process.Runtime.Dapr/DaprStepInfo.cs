@@ -1,5 +1,6 @@
 // Copyright (c) Microsoft. All rights reserved.
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.Serialization;
@@ -27,6 +28,22 @@ public record DaprStepInfo
     /// A read-only dictionary of output edges from the Step.
     /// </summary>
     public required Dictionary<string, List<KernelProcessEdge>> Edges { get; init; }
+
+    /// <summary>
+    /// Builds an instance of <see cref="KernelProcessStepInfo"/> from the current object.
+    /// </summary>
+    /// <returns>An instance of <see cref="KernelProcessStepInfo"/></returns>
+    /// <exception cref="KernelException"></exception>
+    public KernelProcessStepInfo ToKernelProcessStepInfo()
+    {
+        var innerStepType = Type.GetType(this.InnerStepDotnetType);
+        if (innerStepType is null)
+        {
+            throw new KernelException($"Unable to create inner step type from assembly qualified name `{this.InnerStepDotnetType}`");
+        }
+
+        return new KernelProcessStepInfo(innerStepType, this.State, this.Edges);
+    }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="DaprStepInfo"/> class from an instance of <see cref="KernelProcessStepInfo"/>.

@@ -34,7 +34,8 @@ public class ChatBotController : ControllerBase
     public async Task<IActionResult> PostAsync(string chatBotId, string message)
     {
         var process = this.GetProcess(chatBotId);
-        await process.StartAsync(this._kernel, new KernelProcessEvent() { Id = CommonEvents.StartProcess, Data = "foo" });
+        var processContext = await process.StartAsync(this._kernel, new KernelProcessEvent() { Id = CommonEvents.StartProcess, Data = "foo" }, processId: chatBotId);
+        var finalState = await processContext.GetStateAsync();
 
         return this.Ok(chatBotId);
     }
@@ -82,7 +83,6 @@ public class ChatBotController : ControllerBase
             .StopProcess();
 
         process = processBuilder.Build();
-        process = process with { State = process.State with { Id = processId } };
         this._processMap[processId] = process;
         return process;
     }
@@ -154,7 +154,7 @@ public class ChatBotController : ControllerBase
         public async ValueTask DoItAsync(KernelProcessStepContext context, string astepdata, string bstepdata)
         {
             this._state.CurrentCycle++;
-            if (this._state.CurrentCycle == 3)
+            if (this._state.CurrentCycle >= 3)
             {
                 // Exit the processes
                 Console.WriteLine("##### CStep run cycle 3 - exiting.");

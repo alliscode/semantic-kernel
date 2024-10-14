@@ -10,7 +10,7 @@ namespace Microsoft.SemanticKernel;
 /// </summary>
 public interface IProcess : IActor
 {
-    Task InitializeProcessAsync(DaprProcessInfo process, string? parentProcessId);
+    Task InitializeProcessAsync(DaprProcessInfo processInfo, string? parentProcessId);
 
     Task StartAsync(bool keepAlive);
 
