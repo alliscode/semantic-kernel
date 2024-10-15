@@ -13,8 +13,15 @@ namespace Microsoft.SemanticKernel;
 [KnownType(nameof(GetKnownTypes))]
 public record KernelProcessStepState
 {
+    /// <summary>
+    /// A set of known types that may be used in serialization.
+    /// </summary>
     private readonly static HashSet<Type> s_knownTypes = [];
 
+    /// <summary>
+    /// Used to dynamically provide the set of known types for serialization.
+    /// </summary>
+    /// <returns></returns>
     private static HashSet<Type> GetKnownTypes() => s_knownTypes;
 
     /// <summary>
@@ -44,6 +51,11 @@ public record KernelProcessStepState
         this.Name = name;
     }
 
+    /// <summary>
+    /// Registers a derived type for serialization. Types registered here are used by the KnownType attribute
+    /// to support DataContractSerialization of derived types as required to support Dapr.
+    /// </summary>
+    /// <param name="derivedType">A Type that derives from <typeref name="KernelProcessStepState"/></param>
     public static void RegisterDerivedType(Type derivedType)
     {
         s_knownTypes.Add(derivedType);

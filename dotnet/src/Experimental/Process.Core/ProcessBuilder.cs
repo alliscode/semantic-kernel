@@ -138,7 +138,7 @@ public sealed class ProcessBuilder : ProcessStepBuilder
     /// <returns>An instance of <see cref="ProcessStepBuilder"/></returns>
     public ProcessStepBuilder AddStepFromType<TStep, TState>(TState initialState, string? name = null) where TStep : KernelProcessStep<TState> where TState : class, new()
     {
-        // If the step has a user-defined state then we need to register it as a know type for the DataContractSerialization used by Dapr.
+        // The step has a user-defined state so we need to register it as a know type for the DataContractSerialization used by Dapr.
         var stateType = typeof(KernelProcessStepState<TState>);
         KernelProcessState.RegisterDerivedType(stateType);
 
@@ -147,7 +147,6 @@ public sealed class ProcessBuilder : ProcessStepBuilder
 
         return stepBuilder;
     }
-
 
     /// <summary>
     /// Adds a sub process to the process.
