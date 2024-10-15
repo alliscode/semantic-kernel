@@ -10,11 +10,14 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Logging;
 using Dapr.Actors.Runtime;
 using Dapr.Actors;
+using System.Text.Json;
 
 namespace Microsoft.SemanticKernel;
 internal class StepActor : Actor, IStep, IKernelProcessMessageChannel
 {
     private const string DaprStepInfoStateName = "DaprStepInfo";
+    private const string StepStateJson = "kernelStepStateJson";
+    private const string StepStateType = "kernelStepStateType";
 
     /// <summary>
     /// The generic state type for a process step.
@@ -33,6 +36,7 @@ internal class StepActor : Actor, IStep, IKernelProcessMessageChannel
 
     internal List<DaprMessage> _incomingMessages = new();
     internal KernelProcessStepState? _stepState;
+    internal Type? _stepStateType;
     internal readonly ILoggerFactory? LoggerFactory;
     internal Dictionary<string, List<KernelProcessEdge>>? _outputEdges;
     internal readonly Dictionary<string, KernelFunction> _functions = [];
@@ -141,21 +145,12 @@ internal class StepActor : Actor, IStep, IKernelProcessMessageChannel
 
     protected override async Task OnActivateAsync()
     {
-        // await this.StateManager.TryRemoveStateAsync("kernelStepActivated").ConfigureAwait(false);
-        // await this.StateManager.SaveStateAsync().ConfigureAwait(false);
-        // If the inner step (KernelProcessStep instance) has already been activated then we call activate here also.
-
         var existingStepInfo = await this.StateManager.TryGetStateAsync<DaprStepInfo>(DaprStepInfoStateName).ConfigureAwait(false);
         if (existingStepInfo.HasValue)
         {
             var parentProcessId = await this.StateManager.GetStateAsync<string>("parentProcessId").ConfigureAwait(false);
             await this.Int_InitializeStepAsync(existingStepInfo.Value, parentProcessId).ConfigureAwait(false);
         }
-    }
-
-    protected override Task OnDeactivateAsync()
-    {
-        return base.OnDeactivateAsync();
     }
 
     #endregion
@@ -251,6 +246,11 @@ internal class StepActor : Actor, IStep, IKernelProcessMessageChannel
             this?.Logger?.LogInformation("Function {FunctionName} returned {Result}", targetFunction, invokeResult);
             eventName = $"{targetFunction}.OnResult";
             eventValue = invokeResult?.GetValue<object>();
+
+            // Persist the state after the function has been executed
+            var stateJson = JsonSerializer.Serialize(this._stepState, this._stepStateType!);
+            await this.StateManager.SetStateAsync(StepStateJson, stateJson).ConfigureAwait(false);
+            await this.StateManager.SaveStateAsync().ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -300,36 +300,50 @@ internal class StepActor : Actor, IStep, IKernelProcessMessageChannel
         KernelProcessStepState? stateObject = null;
         Type? stateType = null;
 
-        if (TryGetSubtypeOfStatefulStep(this._innerStepType, out Type? genericStepType) && genericStepType is not null)
+        // Check if the state has already been persisted
+        var stepStateType = await this.StateManager.TryGetStateAsync<string>(StepStateType).ConfigureAwait(false);
+        if (stepStateType.HasValue)
         {
-            // The step is a subclass of KernelProcessStep<>, so we need to extract the generic type argument
-            // and create an instance of the corresponding KernelProcessStepState<>.
-            var userStateType = genericStepType.GetGenericArguments()[0];
-            if (userStateType is null)
-            {
-                var errorMessage = "The generic type argument for the KernelProcessStep subclass could not be determined.";
-                this._logger?.LogError("{ErrorMessage}", errorMessage);
-                throw new KernelException(errorMessage);
-            }
-
-            stateType = typeof(KernelProcessStepState<>).MakeGenericType(userStateType);
-            if (stateType is null)
-            {
-                var errorMessage = "The generic type argument for the KernelProcessStep subclass could not be determined.";
-                this._logger?.LogError("{ErrorMessage}", errorMessage);
-                throw new KernelException(errorMessage);
-            }
-
-            stateObject = (KernelProcessStepState?)Activator.CreateInstance(stateType, this.Name, this.Id.GetId());
+            stateType = Type.GetType(stepStateType.Value);
+            var stateObjectJson = await this.StateManager.GetStateAsync<string>(StepStateJson).ConfigureAwait(false);
+            stateObject = JsonSerializer.Deserialize(stateObjectJson, stateType!) as KernelProcessStepState;
         }
         else
         {
-            // The step is a KernelProcessStep with no user-defined state, so we can use the base KernelProcessStepState.
-            stateType = typeof(KernelProcessStepState);
-            stateObject = new KernelProcessStepState(this.Name, this.Id.GetId());
+            stateObject = this._stepInfo.State;
+            if (TryGetSubtypeOfStatefulStep(this._innerStepType, out Type? genericStepType) && genericStepType is not null)
+            {
+                // The step is a subclass of KernelProcessStep<>, so we need to extract the generic type argument
+                // and create an instance of the corresponding KernelProcessStepState<>.
+                var userStateType = genericStepType.GetGenericArguments()[0];
+                if (userStateType is null)
+                {
+                    var errorMessage = "The generic type argument for the KernelProcessStep subclass could not be determined.";
+                    this._logger?.LogError("{ErrorMessage}", errorMessage);
+                    throw new KernelException(errorMessage);
+                }
+
+                stateType = typeof(KernelProcessStepState<>).MakeGenericType(userStateType);
+                if (stateType is null)
+                {
+                    var errorMessage = "The generic type argument for the KernelProcessStep subclass could not be determined.";
+                    this._logger?.LogError("{ErrorMessage}", errorMessage);
+                    throw new KernelException(errorMessage);
+                }
+            }
+            else
+            {
+                // The step is a KernelProcessStep with no user-defined state, so we can use the base KernelProcessStepState.
+                stateType = typeof(KernelProcessStepState);
+            }
+
+            // Persist the state type and type object.
+            await this.StateManager.AddStateAsync(StepStateType, stateType.AssemblyQualifiedName).ConfigureAwait(false);
+            await this.StateManager.AddStateAsync(StepStateJson, JsonSerializer.Serialize(stateObject)).ConfigureAwait(false);
+            await this.StateManager.SaveStateAsync().ConfigureAwait(false);
         }
 
-        if (stateObject is null)
+        if (stateType is null || stateObject is null)
         {
             var errorMessage = "The state object for the KernelProcessStep could not be created.";
             this._logger?.LogError("{ErrorMessage}", errorMessage);
@@ -346,12 +360,9 @@ internal class StepActor : Actor, IStep, IKernelProcessMessageChannel
         }
 
         this._stepState = stateObject;
+        this._stepStateType = stateType;
         methodInfo.Invoke(stepInstance, [stateObject]);
         await stepInstance.ActivateAsync(stateObject).ConfigureAwait(false);
-
-        // Save the state
-        await this.StateManager.TryAddStateAsync("kernelStepActivated", true).ConfigureAwait(false);
-        await this.StateManager.SaveStateAsync().ConfigureAwait(false);
     }
 
     /// <summary>

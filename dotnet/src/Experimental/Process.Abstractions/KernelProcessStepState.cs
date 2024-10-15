@@ -61,7 +61,7 @@ public sealed record KernelProcessStepState<TState> : KernelProcessStepState whe
     /// The user-defined state object associated with the Step.
     /// </summary>
     [DataMember]
-    public TState? State { get; set; }
+    public TState? State { get; init; }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="KernelProcessStepState"/> class.

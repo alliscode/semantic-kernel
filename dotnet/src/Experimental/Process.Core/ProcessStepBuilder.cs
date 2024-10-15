@@ -25,6 +25,11 @@ public abstract class ProcessStepBuilder
     public string Name { get; }
 
     /// <summary>
+    /// The initial state of the step. This may be null if the step does not have any state.
+    /// </summary>
+    public object? InitialState { get; protected set; }
+
+    /// <summary>
     /// Define the behavior of the step when the event with the specified Id is fired.
     /// </summary>
     /// <param name="eventId">The Id of the event of interest.</param>
@@ -187,10 +192,11 @@ public sealed class ProcessStepBuilder<TStep> : ProcessStepBuilder where TStep :
     /// <summary>
     /// Creates a new instance of the <see cref="ProcessStepBuilder"/> class. If a name is not provided, the name will be derived from the type of the step.
     /// </summary>
-    public ProcessStepBuilder(string? name = null)
+    public ProcessStepBuilder(string? name = null, object? initialState = default)
         : base(name ?? typeof(TStep).Name)
     {
         this.FunctionsDict = this.GetFunctionMetadataMap();
+        this.InitialState = initialState;
     }
 
     /// <summary>
@@ -211,7 +217,14 @@ public sealed class ProcessStepBuilder<TStep> : ProcessStepBuilder where TStep :
             var stateType = typeof(KernelProcessStepState<>).MakeGenericType(userStateType);
             Verify.NotNull(stateType);
 
+            // If the step has a user-defined state then we need to validate that the initial state is of the correct type.
+            if (this.InitialState is not null && this.InitialState.GetType() != userStateType)
+            {
+                throw new KernelException($"The initial state provided for step {this.Name} is not of the correct type. The expected type is {userStateType.Name}.");
+            }
+
             stateObject = (KernelProcessStepState?)Activator.CreateInstance(stateType, this.Name, this.Id);
+            stateType.GetProperty(nameof(KernelProcessStepState<object>.State))?.SetValue(stateObject, this.InitialState);
         }
         else
         {

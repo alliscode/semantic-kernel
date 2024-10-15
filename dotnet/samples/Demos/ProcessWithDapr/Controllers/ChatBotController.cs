@@ -52,7 +52,7 @@ public class ChatBotController : ControllerBase
         var kickoffStep = processBuilder.AddStepFromType<KickoffStep>();
         var myAStep = processBuilder.AddStepFromType<AStep>();
         var myBStep = processBuilder.AddStepFromType<BStep>();
-        var myCStep = processBuilder.AddStepFromType<CStep>();
+        var myCStep = processBuilder.AddStepFromType<CStep, CStepState>(new() { CurrentCycle = 1 });
 
         processBuilder
             .OnInputEvent(CommonEvents.StartProcess)
@@ -142,11 +142,12 @@ public class ChatBotController : ControllerBase
     /// </summary>
     private sealed class CStep : KernelProcessStep<CStepState>
     {
-        private readonly CStepState _state = new();
+        private CStepState _state = new();
 
         public override ValueTask ActivateAsync(KernelProcessStepState<CStepState> state)
         {
-            state.State = this._state;
+            this._state = state.State ?? new CStepState();
+            Console.WriteLine($"##### CStep activated with Cycle = '{state.State?.CurrentCycle}'.");
             return base.ActivateAsync(state);
         }
 
@@ -174,6 +175,7 @@ public class ChatBotController : ControllerBase
     [DataContract]
     private sealed record CStepState
     {
+        [DataMember]
         public int CurrentCycle { get; set; }
     }
 

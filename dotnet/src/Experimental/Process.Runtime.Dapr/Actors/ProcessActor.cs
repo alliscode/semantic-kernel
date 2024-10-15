@@ -13,7 +13,7 @@ using Dapr.Actors.Runtime;
 using Dapr.Actors;
 
 namespace Microsoft.SemanticKernel;
-internal class ProcessActor : StepActor, IProcess, IDisposable
+internal sealed class ProcessActor : StepActor, IProcess, IDisposable
 {
     private const string DaprProcessInfoStateName = "DaprProcessInfo";
     private const string EndStepId = "Microsoft.SemanticKernel.Process.EndStep";
