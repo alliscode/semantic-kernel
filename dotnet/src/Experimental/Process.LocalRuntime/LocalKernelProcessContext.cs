@@ -24,8 +24,13 @@ public sealed class LocalKernelProcessContext : KernelProcessContext, IDisposabl
         this._localProcess = new LocalProcess(process, kernel);
     }
 
-    internal Task StartWithEventAsync(KernelProcessEvent? initialEvent, Kernel? kernel = null) =>
-        this._localProcess.RunOnceAsync(initialEvent, kernel);
+    /// <summary>
+    /// Starts a process and sends it the initial event.
+    /// </summary>
+    /// <param name="initialEvent">The event to send to the process.</param>
+    /// <returns>A <see cref="Task"/></returns>
+    public override Task StartWithEventAsync(KernelProcessEvent initialEvent) =>
+        this._localProcess.RunOnceAsync(initialEvent, this._kernel);
 
     /// <summary>
     /// Sends a message to the process.

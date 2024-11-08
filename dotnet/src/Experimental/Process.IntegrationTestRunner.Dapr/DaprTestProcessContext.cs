@@ -36,7 +36,7 @@ internal sealed class DaprTestProcessContext : KernelProcessContext
     /// </summary>
     /// <param name="initialEvent">The initial event.</param>
     /// <returns></returns>
-    internal async Task StartWithEventAsync(KernelProcessEvent initialEvent)
+    public override async Task StartWithEventAsync(KernelProcessEvent initialEvent)
     {
         var daprProcess = DaprProcessInfo.FromKernelProcess(this._process);
         var request = new ProcessStartRequest { Process = daprProcess, InitialEvent = initialEvent };

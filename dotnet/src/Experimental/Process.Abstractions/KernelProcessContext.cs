@@ -23,6 +23,13 @@ public abstract class KernelProcessContext
     public abstract Task StopAsync();
 
     /// <summary>
+    /// Starts a process and sends it the initial event.
+    /// </summary>
+    /// <param name="initialEvent">The event to send to the process.</param>
+    /// <returns>A <see cref="Task"/></returns>
+    public abstract Task StartWithEventAsync(KernelProcessEvent initialEvent);
+
+    /// <summary>
     /// Gets a snapshot of the current state of the process.
     /// </summary>
     /// <returns>A <see cref="Task{T}"/> where T is <see cref="KernelProcess"/></returns>
