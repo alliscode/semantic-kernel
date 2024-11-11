@@ -32,7 +32,12 @@ public class ChatController : ControllerBase
         var state = await chatProcessContext.GetStateAsync();
         var techHelpStep = state.Steps.Where(s => s.State.Name == nameof(TechHelpStep)).FirstOrDefault();
         var techHelpState = techHelpStep.State as KernelProcessStepState<TechHelpState>;
-        var lastResponse = techHelpState.State.ChatHistory.LastOrDefault();
+        if (techHelpState == null)
+        {
+            return this.StatusCode(500);
+        }
+
+        var lastResponse = techHelpState.State.LastResponse;
         return this.Ok(lastResponse);
     }
 }

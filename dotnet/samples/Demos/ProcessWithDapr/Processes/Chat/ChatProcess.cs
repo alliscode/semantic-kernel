@@ -3,6 +3,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
+using System.Text.Json;
 using Microsoft.Extensions.Options;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
@@ -81,6 +82,7 @@ public class TechHelpStep : KernelProcessStep<TechHelpState>
     private readonly IChatCompletionService _chatCompletionService;
     private readonly TechHelpOptions _config;
     private TechHelpState _state = new();
+    private ChatHistory _chatHistory = new();
 
     public TechHelpStep(Kernel kernel,  IOptions<TechHelpOptions> configOptions)
     {
@@ -93,10 +95,16 @@ public class TechHelpStep : KernelProcessStep<TechHelpState>
     {
         this._state = state.State!;
 
+
         // Initialize the ChatHistory if it is not already initialized.
         if (this._state.ChatHistory == null)
         {
-            this._state.ChatHistory = new ChatHistory(this._config.SystemMessage);
+            this._chatHistory = new ChatHistory(this._config.SystemMessage);
+            this._state.ChatHistory = JsonSerializer.Serialize(this._chatHistory);
+        }
+        else
+        {
+            this._chatHistory = JsonSerializer.Deserialize<ChatHistory>(this._state.ChatHistory);
         }
 
         return base.ActivateAsync(state);
@@ -106,8 +114,9 @@ public class TechHelpStep : KernelProcessStep<TechHelpState>
     public async Task ProcessInputAsync(KernelProcessStepContext context, string message)
     {
         // Process the input message.
-        this._state.ChatHistory.AddMessage(AuthorRole.User, message);
-        var response = await this._chatCompletionService.GetChatMessageContentsAsync(message);
+        this._chatHistory.AddMessage(AuthorRole.User, message);
+        var response = await this._chatCompletionService.GetChatMessageContentAsync(message);
+        this._chatHistory.AddMessage(AuthorRole.System, response?.ToString() ?? "");
 
         // Send the response event.
         await context.EmitEventAsync(new()
@@ -115,6 +124,9 @@ public class TechHelpStep : KernelProcessStep<TechHelpState>
             Id = Enum.GetName(TechHelpEvents.TechHelpResponse)!,
             Data = response
         });
+
+        this._state.LastResponse = response?.ToString() ?? "";
+        this._state.ChatHistory = JsonSerializer.Serialize(this._chatHistory);
     }
 }
 
@@ -122,5 +134,8 @@ public class TechHelpStep : KernelProcessStep<TechHelpState>
 public class TechHelpState
 {
     [DataMember]
-    public ChatHistory ChatHistory { get; set; }
+    public string ChatHistory { get; set; }
+
+    [DataMember]
+    public string LastResponse { get; set; }
 }

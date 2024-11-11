@@ -96,6 +96,8 @@ internal class StepActor : Actor, IStep, IKernelProcessMessageChannel
             throw new KernelException($"Could not load the inner step type '{stepInfo.InnerStepDotnetType}'.").Log(this._logger);
         }
 
+        this.Logger.LogWarning("################################## INITIALIZED STATE TYPE: {StateType}", stepInfo.State.GetType().Name);
+
         this.ParentProcessId = parentProcessId;
         this._stepInfo = stepInfo;
         this._stepState = this._stepInfo.State;
@@ -155,6 +157,8 @@ internal class StepActor : Actor, IStep, IKernelProcessMessageChannel
         // Lazy one-time initialization of the step before extracting state information.
         // This allows state information to be extracted even if the step has not been activated.
         await this._activateTask.Value.ConfigureAwait(false);
+
+        this.Logger.LogWarning("################################## TODAPR STATE TYPE: {StateType}", this._stepInfo!.State.GetType().Name);
 
         var stepInfo = new DaprStepInfo { InnerStepDotnetType = this._stepInfo!.InnerStepDotnetType!, State = this._stepInfo.State, Edges = this._stepInfo.Edges! };
         return stepInfo;
