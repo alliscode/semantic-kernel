@@ -20,7 +20,8 @@ internal static class ProcessEventSerializer
     public static string ToJson(this ProcessEvent processEvent)
     {
         EventContainer<ProcessEvent> containedEvent = new(TypeInfo.GetAssemblyQualifiedType(processEvent.Data), processEvent);
-        return JsonSerializer.Serialize(containedEvent);
+        string serialized = JsonSerializer.Serialize(containedEvent);
+        return serialized;
     }
 
     /// <summary>

@@ -393,7 +393,10 @@ internal class StepActor : Actor, IStep, IKernelProcessMessageChannel
             {
                 // Emit the event to the parent process
                 IEventBuffer parentProcess = this.ProxyFactory.CreateActorProxy<IEventBuffer>(new ActorId(this.ParentProcessId), nameof(EventBufferActor));
-                await parentProcess.EnqueueAsync(daprEvent.ToJson()).ConfigureAwait(false);
+
+                string jsonEvent = daprEvent.ToJson();
+
+                await parentProcess.EnqueueAsync(jsonEvent).ConfigureAwait(false);
             }
         }
 
