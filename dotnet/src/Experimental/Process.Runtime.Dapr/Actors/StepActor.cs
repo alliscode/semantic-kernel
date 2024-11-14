@@ -110,7 +110,7 @@ internal class StepActor : Actor, IStep, IKernelProcessMessageChannel
     /// Triggers the step to dequeue all pending messages and prepare for processing.
     /// </summary>
     /// <returns>A <see cref="Task{Task}"/> where T is an <see cref="int"/> indicating the number of messages that are prepared for processing.</returns>
-    public async Task<int> PrepareIncomingMessagesAsync()
+    public virtual async Task<int> PrepareIncomingMessagesAsync()
     {
         IMessageBuffer messageQueue = this.ProxyFactory.CreateActorProxy<IMessageBuffer>(new ActorId(this.Id.GetId()), nameof(MessageBufferActor));
         IList<string> incoming = await messageQueue.DequeueAllAsync().ConfigureAwait(false);
@@ -132,12 +132,18 @@ internal class StepActor : Actor, IStep, IKernelProcessMessageChannel
     /// Triggers the step to process all prepared messages.
     /// </summary>
     /// <returns>A <see cref="Task"/></returns>
-    public async Task ProcessIncomingMessagesAsync()
+    public virtual async Task ProcessIncomingMessagesAsync()
     {
         // Handle all the incoming messages one at a time
         while (this._incomingMessages.Count > 0)
         {
             var message = this._incomingMessages.Dequeue();
+
+            if (this._stepInfo.State.Name == "EchoStep")
+            {
+                this.Logger.LogWarning($"################ Received message - '{message.FunctionName}'");
+            }
+
             await this.HandleMessageAsync(message).ConfigureAwait(false);
 
             // Save the incoming messages to state

@@ -30,6 +30,7 @@ internal sealed class ProcessActor : StepActor, IProcess, IDisposable
     private JoinableTask? _processTask;
     private CancellationTokenSource? _processCancelSource;
     private bool _isInitialized;
+    private bool _isRunningAsSubprocess;
     private ILogger? _logger;
 
     /// <summary>
@@ -179,6 +180,56 @@ internal sealed class ProcessActor : StepActor, IProcess, IDisposable
 
     #endregion
 
+    public override async Task<int> PrepareIncomingMessagesAsync()
+    {
+        var numMessages = await base.PrepareIncomingMessagesAsync().ConfigureAwait(false);
+        if (numMessages > 0)
+        {
+            this.Logger.LogWarning($"################### ProcessActor.{this._process.State.Name}.PrepareIncomingMessagesAsync(): {numMessages} messages. ###################");
+            return numMessages;
+        }
+        else if (this._isRunningAsSubprocess)
+        {
+            // Keep the process alive if it's running as a subprocess.
+            this.Logger.LogWarning($"################### ProcessActor.{this._process.State.Name}.PrepareIncomingMessagesAsync(): 0 messages, subprocess running. ###################");
+            return 1;
+        }
+
+        this.Logger.LogWarning($"################### ProcessActor.{this._process.State.Name}.PrepareIncomingMessagesAsync(): {numMessages} messages, no subprocess. ###################");
+        return 0;
+    }
+
+    /// <summary>
+    /// Triggers the step to process all prepared messages.
+    /// </summary>
+    /// <returns>A <see cref="Task"/></returns>
+    public override async Task ProcessIncomingMessagesAsync()
+    {
+        //// Handle all the incoming messages one at a time
+        //while (this._incomingMessages.Count > 0)
+        //{
+        //    var message = this._incomingMessages.Dequeue();
+        //    await this.HandleMessageAsync(message).ConfigureAwait(false);
+
+        //    // Save the incoming messages to state
+        //    await this.StateManager.SetStateAsync(ActorStateKeys.StepIncomingMessagesState, this._incomingMessages).ConfigureAwait(false);
+        //    await this.StateManager.SaveStateAsync().ConfigureAwait(false);
+        //}
+
+        // This will turn any message destined for this subprocess into an external event and enqueue it.
+
+        this.Logger.LogWarning($"################### ProcessActor.{this._process.State.Name}.ProcessIncomingMessagesAsync() ###################");
+
+        this._isRunningAsSubprocess = true;
+        await base.ProcessIncomingMessagesAsync().ConfigureAwait(false);
+        this._processCancelSource ??= new CancellationTokenSource();
+        this._processTask = this._joinableTaskFactory.RunAsync(async () =>
+        {
+            var running = await this.ExecuteNextSuperStepAsync(keepAlive: false, cancellationToken: this._processCancelSource.Token).ConfigureAwait(false);
+            this._isRunningAsSubprocess = running;
+        });
+    }
+
     /// <summary>
     /// Handles a <see cref="ProcessMessage"/> that has been sent to the process. This happens only in the case
     /// of a process (this one) running as a step within another process (this one's parent). In this case the
@@ -202,7 +253,13 @@ internal sealed class ProcessActor : StepActor, IProcess, IDisposable
                 KernelProcessEvent nestedEvent = new() { Id = eventId, Data = message.TargetEventData };
 
                 // Run the nested process completely within a single superstep.
-                await this.RunOnceAsync(nestedEvent.ToJson()).ConfigureAwait(false);
+                //await this.RunOnceAsync(nestedEvent.ToJson()).ConfigureAwait(false);
+
+                // Enqueue the event to the external event buffer.
+                IExternalEventBuffer externalEventQueue = this.ProxyFactory.CreateActorProxy<IExternalEventBuffer>(new ActorId(this.Id.GetId()), nameof(ExternalEventBufferActor));
+                await externalEventQueue.EnqueueAsync(nestedEvent.ToJson()).ConfigureAwait(false);
+
+                this.Logger.LogWarning($"################### ProcessActor.{this._process.State.Name}.EnqueuedExternalEvent ###################");
             }
         }
     }
@@ -279,45 +336,11 @@ internal sealed class ProcessActor : StepActor, IProcess, IDisposable
             // Run the Pregel algorithm until there are no more messages being sent.
             for (int superstep = 0; superstep < maxSupersteps; superstep++)
             {
-                // Check for EndStep messages. If there are any then cancel the process.
-                if (await this.IsEndMessageSentAsync().ConfigureAwait(false))
+                if (!await this.ExecuteNextSuperStepAsync(keepAlive, cancellationToken).ConfigureAwait(false))
                 {
-                    this._processCancelSource?.Cancel();
                     break;
                 }
-
-                // Translate any global error events into an message that targets the appropriate step, when one exists.
-                await this.HandleGlobalErrorMessageAsync().ConfigureAwait(false);
-
-                // Check for external events
-                await this.EnqueueExternalMessagesAsync().ConfigureAwait(false);
-
-                // Reach out to all of the steps in the process and instruct them to retrieve their pending messages from their associated queues.
-                var stepPreparationTasks = this._steps.Select(step => step.PrepareIncomingMessagesAsync()).ToArray();
-                var messageCounts = await Task.WhenAll(stepPreparationTasks).ConfigureAwait(false);
-
-                // If there are no messages to process, wait for an external event or finish.
-                if (messageCounts.Sum() == 0)
-                {
-                    if (!keepAlive || !await this._externalEventChannel.Reader.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
-                    {
-                        this._processCancelSource?.Cancel();
-                        break;
-                    }
-                }
-
-                // Process the incoming messages for each step.
-                var stepProcessingTasks = this._steps.Select(step => step.ProcessIncomingMessagesAsync()).ToArray();
-                await Task.WhenAll(stepProcessingTasks).ConfigureAwait(false);
-
-                // Handle public events that need to be bubbled out of the process.
-                await this.SendOutgoingPublicEventsAsync().ConfigureAwait(false);
             }
-        }
-        catch (Exception ex)
-        {
-            this._logger?.LogError(ex, "An error occurred while running the process: {ErrorMessage}.", ex.Message);
-            throw;
         }
         finally
         {
@@ -330,6 +353,54 @@ internal sealed class ProcessActor : StepActor, IProcess, IDisposable
         }
 
         return;
+    }
+
+    private async Task<bool> ExecuteNextSuperStepAsync(bool keepAlive = true, CancellationToken cancellationToken = default)
+    {
+        this.Logger.LogWarning($"################### ProcessActor.{this._process.State.Name}.ExecuteNextSuperStepAsync() ####################");
+        try
+        {
+            // Check for EndStep messages. If there are any then cancel the process.
+            if (await this.IsEndMessageSentAsync().ConfigureAwait(false))
+            {
+                this._processCancelSource?.Cancel();
+                return false;
+            }
+
+            // Translate any global error events into an message that targets the appropriate step, when one exists.
+            await this.HandleGlobalErrorMessageAsync().ConfigureAwait(false);
+
+            // Check for external events
+            await this.EnqueueExternalMessagesAsync().ConfigureAwait(false);
+
+            // Reach out to all of the steps in the process and instruct them to retrieve their pending messages from their associated queues.
+            var stepPreparationTasks = this._steps.Select(step => step.PrepareIncomingMessagesAsync()).ToArray();
+            var messageCounts = await Task.WhenAll(stepPreparationTasks).ConfigureAwait(false);
+
+            // If there are no messages to process, wait for an external event or finish.
+            if (messageCounts.Sum() == 0)
+            {
+                if (!keepAlive || !await this._externalEventChannel.Reader.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    this._processCancelSource?.Cancel();
+                    return false;
+                }
+            }
+
+            // Process the incoming messages for each step.
+            var stepProcessingTasks = this._steps.Select(step => step.ProcessIncomingMessagesAsync()).ToArray();
+            await Task.WhenAll(stepProcessingTasks).ConfigureAwait(false);
+
+            // Handle public events that need to be bubbled out of the process.
+            await this.SendOutgoingPublicEventsAsync().ConfigureAwait(false);
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            this._logger?.LogError(ex, "An error occurred while running the process: {ErrorMessage}.", ex.Message);
+            throw;
+        }
     }
 
     /// <summary>
@@ -413,6 +484,8 @@ internal sealed class ProcessActor : StepActor, IProcess, IDisposable
                 {
                     foreach (var edge in edges)
                     {
+                        this.Logger.LogWarning($"################### ProcessActor.{this._process.State.Name}.SendOutgoingPublicEventsAsync() - '{scopedEvent.QualifiedId}' ###################");
+
                         ProcessMessage message = ProcessMessageFactory.CreateFromEdge(edge, scopedEvent.Data);
                         var scopedMessageBufferId = this.ScopedActorId(new ActorId(edge.OutputTarget.StepId), scopeToParent: true);
                         var messageQueue = this.ProxyFactory.CreateActorProxy<IMessageBuffer>(scopedMessageBufferId, nameof(MessageBufferActor));
