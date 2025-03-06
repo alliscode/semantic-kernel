@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+option csharp_namespace = "Microsoft.SemanticKernel.Process.Serialization";
+
+message dotnet_content  {
+    string assembly_qualified_type_name = 1;
+    string json_value = 2;
+}
+
+message json_content {
+    string json_value = 1;
+}
+
+message EventContainer {
+    string event_id = 1;
+    oneof content {
+        dotnet_content dotnet = 2;
+        json_content json = 3;
+    }
+}
+
+message EnqueueMessage {
+    string content = 1;
+}
+
+message DequeueMessage {
+}
+
+message DequeueMessageResponse {
+    repeated string messages = 1;
+}

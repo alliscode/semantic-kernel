@@ -1,9 +1,10 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
 using System;
+using System.Diagnostics;
 using System.Threading.Tasks;
-using Dapr.Actors;
-using Dapr.Actors.Client;
+using Microsoft.AutoGen.Contracts;
+using Microsoft.AutoGen.Core;
 using Microsoft.SemanticKernel.Process;
 using Microsoft.SemanticKernel.Process.Serialization;
 
@@ -12,23 +13,25 @@ namespace Microsoft.SemanticKernel;
 /// <summary>
 /// A context for a Dapr kernel process.
 /// </summary>
-public class DaprKernelProcessContext : KernelProcessContext
+public class CoreKernelProcessContext : KernelProcessContext
 {
     private readonly KernelProcess _process;
+    private readonly AgentId _processAgentId;
+    private readonly IAgentRuntime _agentRuntime;
 
-    internal DaprKernelProcessContext(KernelProcess process)
+    internal CoreKernelProcessContext(KernelProcess process)
     {
         Verify.NotNull(process);
         Verify.NotNullOrWhiteSpace(process.State?.Name);
 
         if (string.IsNullOrWhiteSpace(process.State.Id))
-        { 
+        {
             process = process with { State = process.State with { Id = Guid.NewGuid().ToString() } };
         }
 
         this._process = process;
-        var processId = new ActorId(process.State.Id);
-        this._daprProcess = ActorProxy.Create<IProcess>(processId, nameof(ProcessActor));
+        this._processAgentId = new AgentId(nameof(CoreProcess), process.State.Id);
+        this._agentRuntime = new InProcessRuntime();
     }
 
     /// <summary>
