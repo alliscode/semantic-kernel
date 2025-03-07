@@ -1,6 +1,8 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 using System.Collections;
 using System.Collections.Concurrent;
+using Microsoft.AutoGen.Contracts;
+using Microsoft.AutoGen.Core;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.SemanticKernel.Process.Internal;
@@ -8,6 +10,7 @@ using Microsoft.SemanticKernel.Process.Runtime;
 
 namespace Microsoft.SemanticKernel;
 
+[TypeSubscription("default")]
 internal sealed class CoreMap : CoreStep
 {
     private readonly HashSet<string> _mapEvents;
@@ -19,8 +22,7 @@ internal sealed class CoreMap : CoreStep
     /// </summary>
     /// <param name="map">The <see cref="KernelProcessMap"/> instance.</param>
     /// <param name="kernel">An instance of <see cref="Kernel"/></param>
-    internal CoreMap(KernelProcessMap map, Kernel kernel)
-        : base(map, kernel)
+    internal CoreMap(AgentId id, IAgentRuntime runtime, Kernel kernel) : base(id, runtime, kernel)
     {
         this._map = map;
         this._logger = this._kernel.LoggerFactory?.CreateLogger(this._map.State.Name) ?? new NullLogger<CoreStep>();

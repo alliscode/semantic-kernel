@@ -14,6 +14,7 @@ namespace Microsoft.SemanticKernel;
 /// </summary>
 public class DaprKernelProcessContext : KernelProcessContext
 {
+    private readonly IProcess _daprProcess;
     private readonly KernelProcess _process;
 
     internal DaprKernelProcessContext(KernelProcess process)
@@ -22,7 +23,7 @@ public class DaprKernelProcessContext : KernelProcessContext
         Verify.NotNullOrWhiteSpace(process.State?.Name);
 
         if (string.IsNullOrWhiteSpace(process.State.Id))
-        { 
+        {
             process = process with { State = process.State with { Id = Guid.NewGuid().ToString() } };
         }
 

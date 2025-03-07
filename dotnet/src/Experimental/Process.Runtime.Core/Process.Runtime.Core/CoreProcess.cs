@@ -109,14 +109,15 @@ internal sealed class CoreProcess : CoreStep, IDisposable
     /// </summary>
     /// <param name="processEvent">Required. The <see cref="KernelProcessEvent"/> to start the process with.</param>
     /// <returns>A <see cref="Task"/></returns>
-    public async Task RunOnceAsync(string processEvent)
+    //public async Task RunOnceAsync(string processEvent)
+    public async Task HandleAsync(RunOnce message)
     {
-        Verify.NotNull(processEvent, nameof(processEvent));
+        Verify.NotNull(message?.Event, nameof(message.Event));
 
         AgentId externalEventBufferId = new("ExternalEventBufferAgent", this._id.Key);
         //IExternalEventBuffer externalEventQueue = this.ProxyFactory.CreateActorProxy<IExternalEventBuffer>(new ActorId(this.Id.GetId()), nameof(ExternalEventBufferActor));
 
-        await this._runtime.SendMessageAsync(new EnqueueMessage() { Content = processEvent }, externalEventBufferId).ConfigureAwait(false);
+        await this._runtime.SendMessageAsync(new EnqueueMessage() { Content = message.Event }, externalEventBufferId).ConfigureAwait(false);
         //await externalEventQueue.EnqueueAsync(processEvent).ConfigureAwait(false);
 
         await this.StartAsync(keepAlive: false).ConfigureAwait(false);

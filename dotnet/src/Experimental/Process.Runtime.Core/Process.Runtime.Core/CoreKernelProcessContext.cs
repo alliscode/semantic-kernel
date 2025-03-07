@@ -7,6 +7,7 @@ using Microsoft.AutoGen.Contracts;
 using Microsoft.AutoGen.Core;
 using Microsoft.SemanticKernel.Process;
 using Microsoft.SemanticKernel.Process.Serialization;
+using Process.Runtime.Core;
 
 namespace Microsoft.SemanticKernel;
 
@@ -33,11 +34,11 @@ public class CoreKernelProcessContext : KernelProcessContext
         this._processAgentId = new AgentId(nameof(CoreProcess), process.State.Id);
         this._agentRuntime = new InProcessRuntime();
 
-        this._agentRuntime.RegisterAgentFactoryAsync(
-            type: nameof(CoreProcess), (AgentId id, IAgentRuntime runtime) =>
-            {
-                return ValueTask.FromResult(new CoreProcess(id, runtime, new Kernel()));
-            });
+        //this._agentRuntime.RegisterAgentFactoryAsync(
+        //    type: nameof(CoreProcess), (AgentId id, IAgentRuntime runtime) =>
+        //    {
+        //        return ValueTask.FromResult(new CoreProcess(id, runtime, new Kernel()));
+        //    });
     }
 
     /// <summary>
@@ -45,11 +46,29 @@ public class CoreKernelProcessContext : KernelProcessContext
     /// </summary>
     /// <param name="initialEvent">The initial event.</param>
     /// <param name="eventProxyStepId">An optional identifier of an actor requesting to proxy events.</param>
-    internal async Task StartWithEventAsync(KernelProcessEvent initialEvent, ActorId? eventProxyStepId = null)
+    internal async Task StartWithEventAsync(KernelProcessEvent initialEvent, AgentId? eventProxyStepId = null)
     {
-        var daprProcess = DaprProcessInfo.FromKernelProcess(this._process);
-        await this._daprProcess.InitializeProcessAsync(daprProcess, null, eventProxyStepId?.GetId()).ConfigureAwait(false);
-        await this._daprProcess.RunOnceAsync(initialEvent.ToJson()).ConfigureAwait(false);
+        //var daprProcess = DaprProcessInfo.FromKernelProcess(this._process);
+        //await this._daprProcess.InitializeProcessAsync(daprProcess, null, eventProxyStepId?.GetId()).ConfigureAwait(false);
+        //await this._daprProcess.RunOnceAsync(initialEvent.ToJson()).ConfigureAwait(false);
+
+        var process = this._process.ToProcessStepInfo();
+        await this._agentRuntime.SendMessageAsync(
+            new InitializeStep
+            {
+                StepInfo = process,
+                EventProxyStepId = eventProxyStepId?.Key
+            },
+            this._processAgentId
+            ).ConfigureAwait(false);
+
+        await this._agentRuntime.SendMessageAsync(
+            new RunOnce
+            {
+                Event = initialEvent.ToJson()
+            },
+            this._processAgentId
+            ).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -58,13 +77,22 @@ public class CoreKernelProcessContext : KernelProcessContext
     /// <param name="processEvent">The event to sent to the process.</param>
     /// <returns>A <see cref="Task"/></returns>
     public override async Task SendEventAsync(KernelProcessEvent processEvent) =>
-        await this._daprProcess.SendMessageAsync(processEvent.ToJson()).ConfigureAwait(false);
+        await this._agentRuntime.SendMessageAsync(
+            new SendMessage
+            {
+                Event = processEvent.ToJson()
+            },
+            this._processAgentId
+            ).ConfigureAwait(false);
 
     /// <summary>
     /// Stops the process.
     /// </summary>
     /// <returns>A <see cref="Task"/></returns>
-    public override async Task StopAsync() => await this._daprProcess.StopAsync().ConfigureAwait(false);
+    public override Task StopAsync()
+    {
+        return Task.CompletedTask;
+    }
 
     /// <summary>
     /// Gets a snapshot of the current state of the process.
@@ -72,8 +100,17 @@ public class CoreKernelProcessContext : KernelProcessContext
     /// <returns>A <see cref="Task{T}"/> where T is <see cref="KernelProcess"/></returns>
     public override async Task<KernelProcess> GetStateAsync()
     {
-        var daprProcessInfo = await this._daprProcess.GetProcessInfoAsync().ConfigureAwait(false);
-        return daprProcessInfo.ToKernelProcess();
+        var result = await this._agentRuntime.SendMessageAsync(
+            new ToProcessStepInfo(),
+            this._processAgentId
+            ).ConfigureAwait(false);
+
+        if (result is not ToProcessStepInfoResponse processInfo)
+        {
+            throw new KernelException($"Unable to get process state from {nameof(CoreKernelProcessContext)}");
+        }
+
+        return null;
     }
 
     /// <inheritdoc/>

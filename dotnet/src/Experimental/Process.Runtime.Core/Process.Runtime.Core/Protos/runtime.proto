@@ -102,3 +102,11 @@ message MapStep {
 message ProcessStep {
     repeated ProcessStepInfo steps = 1;
 }
+
+message RunOnce {
+    string event = 1;
+}
+
+message SendMessage {
+    string event = 1;
+}
