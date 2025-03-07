@@ -172,9 +172,9 @@ internal sealed class CoreProcess : CoreStep, IDisposable
     //    return await this.ToDaprProcessInfoAsync().ConfigureAwait(false);
     //}
 
-    public async Task<ProcessStepInfo> HandleAsync(ProcessInfoRequest request)
+    public async Task<ProcessStepInfo> HandleAsync(ProcessInfoRequest request, CancellationToken cancellationToken)
     {
-        var processInfo = await this.ToProcessInfoAsync().ConfigureAwait(false);
+        var processInfo = await this.ToProcessInfoAsync(cancellationToken).ConfigureAwait(false);
         return processInfo;
     }
 
@@ -555,23 +555,28 @@ internal sealed class CoreProcess : CoreStep, IDisposable
             AgentId eventBufferId = new AgentId(nameof(EventBufferAgent), this._id.Key);
 
             //IList<string> allEvents = await eventQueue.DequeueAllAsync().ConfigureAwait(false);
-            IList<string> allEvents = await this._runtime.SendMessageAsync(new DequeueMessages(), eventBufferId).ConfigureAwait(false);
+            var dequeueResult = await this._runtime.SendMessageAsync(new DequeueMessage(), eventBufferId).ConfigureAwait(false);
+            if (dequeueResult is not DequeueMessageResponse dequeueResponse)
+            {
+                throw new KernelException("The response from the DequeuePublicEvents was not of the expected type.").Log(this._logger);
+            }
 
-
+            IList<string> allEvents = dequeueResponse.Messages;
             IList<ProcessEvent> processEvents = allEvents.ToProcessEvents();
 
             foreach (ProcessEvent processEvent in processEvents)
             {
                 ProcessEvent scopedEvent = this.ScopedEvent(processEvent);
-                if (this._outputEdges!.TryGetValue(scopedEvent.QualifiedId, out List<KernelProcessEdge>? edges) && edges is not null)
+                if (this._outputEdges!.TryGetValue(scopedEvent.QualifiedId, out List<ProcessEdge>? edges) && edges is not null)
                 {
                     foreach (var edge in edges)
                     {
-                        ProcessMessage message = ProcessMessageFactory.CreateFromEdge(edge, scopedEvent.Data);
+                        KernelProcessEdge kernelProcessEdge = new(edge.SourceStepId, new KernelProcessFunctionTarget(edge.OutputTarget.StepId, edge.OutputTarget.FunctionName));
+                        ProcessMessage message = ProcessMessageFactory.CreateFromEdge(kernelProcessEdge, scopedEvent.Data);
                         var scopedMessageBufferId = this.ScopedActorId(new AgentId(nameof(EventBufferAgent), edge.OutputTarget.StepId), scopeToParent: true);
                         //var messageQueue = this.ProxyFactory.CreateActorProxy<IMessageBuffer>(scopedMessageBufferId, nameof(MessageBufferActor));
                         //await messageQueue.EnqueueAsync(message.ToJson()).ConfigureAwait(false);
-                        await this._runtime.SendMessageAsync(new EnqueueMessage(message.ToJson()), scopedMessageBufferId).ConfigureAwait(false);
+                        await this._runtime.SendMessageAsync(new EnqueueMessage() { Content = message.ToJson() }, scopedMessageBufferId).ConfigureAwait(false);
                     }
                 }
             }
@@ -588,14 +593,13 @@ internal sealed class CoreProcess : CoreStep, IDisposable
         //var endMessageQueue = this.ProxyFactory.CreateActorProxy<IMessageBuffer>(scopedMessageBufferId, nameof(MessageBufferActor));
 
         //var messages = await endMessageQueue.DequeueAllAsync().ConfigureAwait(false);
-        var messages = await this._runtime.SendMessageAsync(new DequeueMessages(), scopedMessageBufferId).ConfigureAwait(false);
-
-        if (messages is IList<string> messageList)
+        var dequeueResult = await this._runtime.SendMessageAsync(new DequeueMessage(), scopedMessageBufferId).ConfigureAwait(false);
+        if (dequeueResult is not DequeueMessageResponse dequeueResponse)
         {
-            return messageList.Count > 0;
+            throw new KernelException("The response from the DequeuePublicEvents was not of the expected type.").Log(this._logger);
         }
 
-        throw new KernelException("The end message queue is not a list of messages.").Log(this._logger);
+        return dequeueResponse.Messages.Count > 0;
     }
 
     /// <summary>
@@ -603,12 +607,30 @@ internal sealed class CoreProcess : CoreStep, IDisposable
     /// </summary>
     /// <returns>An instance of <see cref="DaprProcessInfo"/></returns>
     /// <exception cref="InvalidOperationException"></exception>
-    private async Task<ProcessInfo> ToProcessInfoAsync()
+    private async Task<ProcessStepInfo> ToProcessInfoAsync(CancellationToken cancellationToken)
     {
-        var processState = new KernelProcessState(this.Name, this._process!.State.Version, this._id.Key);
-        var stepTasks = this._steps.Select(step => step.ToDaprStepInfoAsync()).ToList();
+        var processState = new ProcessStepState() { Name = this.Name, Version = this._process!.State.Version, Id = this._id.Key };
+        var stepTasks = this._steps.Select(step => this.GetStepAsProcessInfoAsync(step, cancellationToken)).ToList();
         var steps = await Task.WhenAll(stepTasks).ConfigureAwait(false);
-        return new DaprProcessInfo { InnerStepDotnetType = this._process!.InnerStepDotnetType, Edges = this._process!.Edges, State = processState, Steps = [.. steps] };
+        return new ProcessStepInfo { InnerStepDotnetType = this._process!.InnerStepDotnetType, Edges = { this._process!.Edges }, State = processState, Process = new ProcessStep() { Steps = { steps } } };
+    }
+
+    private async Task<ProcessStepInfo> GetStepAsProcessInfoAsync(ProcessStepInfo step, CancellationToken cancellationToken)
+    {
+        var agentType = step.StepTypeInfoCase switch
+        {
+            ProcessStepInfo.StepTypeInfoOneofCase.Process => nameof(CoreProcess),
+            ProcessStepInfo.StepTypeInfoOneofCase.Map => nameof(CoreMap),
+            _ => nameof(CoreStep)
+        };
+
+        var response = await this._runtime.SendMessageAsync(new ToProcessStepInfo(), new AgentId(agentType, step.State.Id), cancellationToken: cancellationToken).ConfigureAwait(false);
+        if (response is not ToProcessStepInfoResponse stepInfoResponse)
+        {
+            throw new KernelException("The response from the PrepareIncomingMessages was not of the expected type.").Log(this._logger);
+        }
+
+        return stepInfoResponse.StepInfo;
     }
 
     /// <summary>
