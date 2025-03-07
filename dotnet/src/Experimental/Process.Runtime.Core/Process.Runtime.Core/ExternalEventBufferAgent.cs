@@ -6,6 +6,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel.Process.Serialization;
 
 namespace Process.Runtime.Core;
+
+[TypeSubscription("default")]
 public class ExternalEventBufferAgent : BaseAgent
 {
     private readonly List<string> _queue = [];
@@ -18,7 +20,7 @@ public class ExternalEventBufferAgent : BaseAgent
     /// Dequeues an event.
     /// </summary>
     /// <returns>A <see cref="List{T}"/> where T is <see cref="ProcessEvent"/></returns>
-    public async Task<DequeueMessageResponse> DequeueAllAsync()
+    public Task<DequeueMessageResponse> HandleAsync(DequeueMessage request)
     {
         // Dequeue and clear the queue.
         var response = new DequeueMessageResponse();
@@ -29,15 +31,17 @@ public class ExternalEventBufferAgent : BaseAgent
         //await this.StateManager.SetStateAsync(ActorStateKeys.ExternalEventQueueState, this._queue).ConfigureAwait(false);
         //await this.StateManager.SaveStateAsync().ConfigureAwait(false);
 
-        return response;
+        return Task.FromResult(response);
     }
 
-    public async Task EnqueueAsync(EnqueueMessage message)
+    public Task HandleAsync(EnqueueMessage message)
     {
         this._queue.Add(message.Content);
 
         // Save the state.
         //await this.StateManager.SetStateAsync(ActorStateKeys.ExternalEventQueueState, this._queue).ConfigureAwait(false);
         //await this.StateManager.SaveStateAsync().ConfigureAwait(false);
+
+        return Task.CompletedTask;
     }
 }

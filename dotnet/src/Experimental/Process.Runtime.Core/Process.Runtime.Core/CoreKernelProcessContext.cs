@@ -32,6 +32,12 @@ public class CoreKernelProcessContext : KernelProcessContext
         this._process = process;
         this._processAgentId = new AgentId(nameof(CoreProcess), process.State.Id);
         this._agentRuntime = new InProcessRuntime();
+
+        this._agentRuntime.RegisterAgentFactoryAsync(
+            type: nameof(CoreProcess), (AgentId id, IAgentRuntime runtime) =>
+            {
+                return ValueTask.FromResult(new CoreProcess(id, runtime, new Kernel()));
+            });
     }
 
     /// <summary>

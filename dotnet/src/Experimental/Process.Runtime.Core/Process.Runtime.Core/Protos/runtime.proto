@@ -2,6 +2,8 @@ syntax = "proto3";
 
 option csharp_namespace = "Microsoft.SemanticKernel.Process.Serialization";
 
+import "google/protobuf/any.proto";
+
 message dotnet_content  {
     string assembly_qualified_type_name = 1;
     string json_value = 2;
@@ -28,4 +30,75 @@ message DequeueMessage {
 
 message DequeueMessageResponse {
     repeated string messages = 1;
+}
+
+message ProcessStepState {
+    string id = 1;
+    string name = 2;
+    string version = 3;
+    string state = 4;
+}
+
+message ProcessEdge {
+    string source_step_id = 1;
+    ProcessFunctionTarget output_target = 2;
+}
+
+message ProcessFunctionTarget {
+    string step_id = 1;
+    string function_name = 2;
+    string parameter_name = 3;
+    string target_event_id = 4;
+}
+
+message ProcessEdgeList {
+    repeated ProcessEdge edges = 1;
+}
+
+message ProcessStepInfo {
+    string inner_step_dotnet_type = 1;
+    ProcessStepState state = 2;
+    map<string, ProcessEdgeList> edges = 3;
+    oneof step_type_info {
+        ProcessStep process = 4;
+        MapStep map = 5;
+    }
+}
+
+message InitializeStep {
+    ProcessStepInfo step_info = 1;
+    string parent_process_id = 2;
+    string event_proxy_step_id = 3;
+}
+
+message PrepareIncomingMessages {
+
+}
+
+message PrepareIncomingMessagesResponse {
+    int32 message_count = 1;
+}
+
+message ProcessIncomingMessages {
+
+}
+
+message ToProcessStepInfo {
+
+}
+
+message ToProcessStepInfoResponse {
+    ProcessStepInfo step_info = 1;
+}
+
+message ProcessInfoRequest {
+
+}
+
+message MapStep {
+    ProcessStepInfo operation = 1;
+}
+
+message ProcessStep {
+    repeated ProcessStepInfo steps = 1;
 }
