@@ -23,7 +23,7 @@ internal class MessageBufferAgent : BaseAgent
         //await this.StateManager.SaveStateAsync().ConfigureAwait(false);
     }
 
-    public async ValueTask<DequeueMessageResponse> HandleAsync(DequeueMessages message, MessageContext messageContext)
+    public async ValueTask<DequeueMessageResponse> HandleAsync(DequeueMessage message, MessageContext messageContext)
     {
         // Dequeue and clear the queue.
         string[] items = [.. this._queue];

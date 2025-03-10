@@ -110,3 +110,17 @@ message RunOnce {
 message SendMessage {
     string event = 1;
 }
+
+message ProcessMessageCore {
+    string source_id = 1;
+    string destination_id = 2;
+    string function_name = 3;
+    map<string, ProcessMessageValue> values = 4;
+    string target_event_id = 5;
+    google.protobuf.Any target_event_data = 6;
+}
+
+message ProcessMessageValue {
+    string type = 1;
+    string value = 2;
+}

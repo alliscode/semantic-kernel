@@ -1,6 +1,4 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
-using System.Collections.Generic;
-using System.Linq;
 using System.Text.Json;
 using Microsoft.SemanticKernel.Process.Runtime;
 

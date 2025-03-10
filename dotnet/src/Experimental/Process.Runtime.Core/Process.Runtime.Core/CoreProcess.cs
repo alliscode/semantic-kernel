@@ -54,7 +54,7 @@ internal sealed class CoreProcess : CoreStep, IDisposable
     #region Public Actor Methods
 
     //public async Task InitializeProcessAsync(ProcessStepInfo processInfo, string? parentProcessId, string? eventProxyStepId = null)
-    public async Task HandleAsync(InitializeStep initializeRequest)
+    public override async Task HandleAsync(InitializeStep initializeRequest)
     {
         Verify.NotNull(initializeRequest);
 
@@ -109,19 +109,23 @@ internal sealed class CoreProcess : CoreStep, IDisposable
     /// </summary>
     /// <param name="processEvent">Required. The <see cref="KernelProcessEvent"/> to start the process with.</param>
     /// <returns>A <see cref="Task"/></returns>
-    //public async Task RunOnceAsync(string processEvent)
-    public async Task HandleAsync(RunOnce message)
+    private async Task RunOnceAsync(string processEvent)
     {
-        Verify.NotNull(message?.Event, nameof(message.Event));
+        Verify.NotNull(processEvent, nameof(processEvent));
 
         AgentId externalEventBufferId = new("ExternalEventBufferAgent", this._id.Key);
         //IExternalEventBuffer externalEventQueue = this.ProxyFactory.CreateActorProxy<IExternalEventBuffer>(new ActorId(this.Id.GetId()), nameof(ExternalEventBufferActor));
 
-        await this._runtime.SendMessageAsync(new EnqueueMessage() { Content = message.Event }, externalEventBufferId).ConfigureAwait(false);
+        await this._runtime.SendMessageAsync(new EnqueueMessage() { Content = processEvent }, externalEventBufferId).ConfigureAwait(false);
         //await externalEventQueue.EnqueueAsync(processEvent).ConfigureAwait(false);
 
         await this.StartAsync(keepAlive: false).ConfigureAwait(false);
         await this._processTask!.JoinAsync().ConfigureAwait(false);
+    }
+
+    public Task HandleAsync(RunOnce message)
+    {
+        return this.RunOnceAsync(message.Event);
     }
 
     /// <summary>
@@ -217,7 +221,7 @@ internal sealed class CoreProcess : CoreStep, IDisposable
     /// entire sub-process should be executed within a single superstep.
     /// </summary>
     /// <param name="message">The message to process.</param>
-    internal override async Task HandleMessageAsync(ProcessMessage message)
+    internal override async Task HandleAsync(ProcessMessageCore message)
     {
         if (string.IsNullOrWhiteSpace(message.TargetEventId))
         {
@@ -313,16 +317,16 @@ internal sealed class CoreProcess : CoreStep, IDisposable
                     //stepActor = this.ProxyFactory.CreateActorProxy<IStep>(scopedMapId, nameof(MapActor));
 
                     // TODO: Map initialization is different and needs different parameters.
-                    AgentId scopedMapId = this.ScopedActorId(new AgentId(nameof(CoreMap), step.State.Id!));
+                    //AgentId scopedMapId = this.ScopedActorId(new AgentId(nameof(CoreMap), step.State.Id!));
 
-                    var initializeMapMessage = new InitializeStep
-                    {
-                        StepInfo = step,
-                        ParentProcessId = this._id.Key,
-                        EventProxyStepId = eventProxyStepId
-                    };
+                    //var initializeMapMessage = new InitializeStep
+                    //{
+                    //    StepInfo = step,
+                    //    ParentProcessId = this._id.Key,
+                    //    EventProxyStepId = eventProxyStepId
+                    //};
 
-                    break;
+                    //break;
 
                 default:
                     // The current step should already have an Id.
@@ -437,7 +441,7 @@ internal sealed class CoreProcess : CoreStep, IDisposable
         var agentType = step.StepTypeInfoCase switch
         {
             ProcessStepInfo.StepTypeInfoOneofCase.Process => nameof(CoreProcess),
-            ProcessStepInfo.StepTypeInfoOneofCase.Map => nameof(CoreMap),
+            ProcessStepInfo.StepTypeInfoOneofCase.Map => "TODO: CoreMap", //nameof(CoreMap),
             _ => nameof(CoreStep)
         };
 
@@ -455,7 +459,7 @@ internal sealed class CoreProcess : CoreStep, IDisposable
         var agentType = step.StepTypeInfoCase switch
         {
             ProcessStepInfo.StepTypeInfoOneofCase.Process => nameof(CoreProcess),
-            ProcessStepInfo.StepTypeInfoOneofCase.Map => nameof(CoreMap),
+            ProcessStepInfo.StepTypeInfoOneofCase.Map => "TODO: CoreMap", //nameof(CoreMap),
             _ => nameof(CoreStep)
         };
 
@@ -621,7 +625,7 @@ internal sealed class CoreProcess : CoreStep, IDisposable
         var agentType = step.StepTypeInfoCase switch
         {
             ProcessStepInfo.StepTypeInfoOneofCase.Process => nameof(CoreProcess),
-            ProcessStepInfo.StepTypeInfoOneofCase.Map => nameof(CoreMap),
+            ProcessStepInfo.StepTypeInfoOneofCase.Map => "TODO: CoreMap", //nameof(CoreMap),
             _ => nameof(CoreStep)
         };
 

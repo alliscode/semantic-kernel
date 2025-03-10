@@ -2,6 +2,7 @@
 
 using System.Reflection;
 using System.Text.Json;
+using Google.Protobuf.Collections;
 using Microsoft.AutoGen.Contracts;
 using Microsoft.AutoGen.Core;
 using Microsoft.Extensions.DependencyInjection;
@@ -30,7 +31,7 @@ internal class CoreStep : BaseAgent, IKernelProcessMessageChannel
     protected Kernel _kernel;
     protected string? _eventNamespace;
 
-    internal Queue<ProcessMessage> _incomingMessages = new();
+    internal Queue<ProcessMessageCore> _incomingMessages = new();
     internal KernelProcessStepState? _stepState;
     internal Type? _stepStateType;
     internal Dictionary<string, List<ProcessEdge>>? _outputEdges;
@@ -91,7 +92,7 @@ internal class CoreStep : BaseAgent, IKernelProcessMessageChannel
     //    //await this.StateManager.SaveStateAsync().ConfigureAwait(false);
     //}
 
-    public async Task HandleAsync(InitializeStep initializaMessage)
+    public virtual async Task HandleAsync(InitializeStep initializaMessage)
     {
         Verify.NotNull(initializaMessage.StepInfo, nameof(initializaMessage.StepInfo));
 
@@ -190,7 +191,14 @@ internal class CoreStep : BaseAgent, IKernelProcessMessageChannel
 
         foreach (ProcessMessage message in messages)
         {
-            this._incomingMessages.Enqueue(message);
+            MapField<string, ProcessMessageValue> values = new();
+            foreach (var kvp in message.Values)
+            {
+                values.Add(kvp.Key, new ProcessMessageValue() { Type = kvp.Value.GetType().AssemblyQualifiedName, Value = JsonSerializer.Serialize(kvp.Value) });
+            }
+
+            var messageCore = new ProcessMessageCore() { DestinationId = message.DestinationId, SourceId = message.SourceId, FunctionName = message.FunctionName, Values = { values } };
+            this._incomingMessages.Enqueue(messageCore);
         }
 
         // Save the incoming messages to state
@@ -280,13 +288,18 @@ internal class CoreStep : BaseAgent, IKernelProcessMessageChannel
     /// <returns>A <see cref="ValueTask"/></returns>
     public ValueTask EmitEventAsync(KernelProcessEvent processEvent) => this.EmitEventAsync(ProcessEvent.Create(processEvent, this._eventNamespace!));
 
+    internal virtual Task HandleAsync(ProcessMessageCore message)
+    {
+        return this.HandleAsync(message);
+    }
+
     /// <summary>
     /// Handles a <see cref="ProcessMessage"/> that has been sent to the step.
     /// </summary>
     /// <param name="message">The message to process.</param>
     /// <returns>A <see cref="Task"/></returns>
     /// <exception cref="KernelException"></exception>
-    internal virtual async Task HandleMessageAsync(ProcessMessage message)
+    internal virtual async Task HandleMessageAsync(ProcessMessageCore message)
     {
         Verify.NotNull(message, nameof(message));
 
