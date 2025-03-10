@@ -30,12 +30,41 @@ public class CoreKernelProcessContext : KernelProcessContext
         this._process = process;
         this._processAgentId = new AgentId(nameof(CoreProcess), process.State.Id);
         this._agentRuntime = new InProcessRuntime();
+    }
 
-        //this._agentRuntime.RegisterAgentFactoryAsync(
-        //    type: nameof(CoreProcess), (AgentId id, IAgentRuntime runtime) =>
-        //    {
-        //        return ValueTask.FromResult(new CoreProcess(id, runtime, new Kernel()));
-        //    });
+    private async Task RegisterRuntimeAgentsAsync()
+    {
+        await this._agentRuntime.RegisterAgentFactoryAsync(
+            type: nameof(CoreProcess), (AgentId id, IAgentRuntime runtime) =>
+            {
+                return ValueTask.FromResult<IHostableAgent>(new CoreProcess(id, runtime, new Kernel()));
+            }).ConfigureAwait(false);
+
+        await this._agentRuntime.RegisterAgentFactoryAsync(
+            type: nameof(CoreStep), (AgentId id, IAgentRuntime runtime) =>
+            {
+                return ValueTask.FromResult<IHostableAgent>(new CoreStep(id, runtime, new Kernel()));
+            }).ConfigureAwait(false);
+
+        // EventBufferAgent, ExternalEventBufferAgent, and ExternalMessageBufferAgent
+
+        await this._agentRuntime.RegisterAgentFactoryAsync(
+            type: nameof(EventBufferAgent), (AgentId id, IAgentRuntime runtime) =>
+            {
+                return ValueTask.FromResult<IHostableAgent>(new EventBufferAgent(id, runtime, ""));
+            }).ConfigureAwait(false);
+
+        await this._agentRuntime.RegisterAgentFactoryAsync(
+            type: nameof(ExternalEventBufferAgent), (AgentId id, IAgentRuntime runtime) =>
+            {
+                return ValueTask.FromResult<IHostableAgent>(new ExternalEventBufferAgent(id, runtime, ""));
+            }).ConfigureAwait(false);
+
+        await this._agentRuntime.RegisterAgentFactoryAsync(
+            type: nameof(ExternalMessageBufferAgent), (AgentId id, IAgentRuntime runtime) =>
+            {
+                return ValueTask.FromResult<IHostableAgent>(new ExternalMessageBufferAgent(id, runtime, ""));
+            }).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -45,6 +74,8 @@ public class CoreKernelProcessContext : KernelProcessContext
     /// <param name="eventProxyStepId">An optional identifier of an actor requesting to proxy events.</param>
     internal async Task StartWithEventAsync(KernelProcessEvent initialEvent, AgentId? eventProxyStepId = null)
     {
+        await this.RegisterRuntimeAgentsAsync().ConfigureAwait(false);
+
         //var daprProcess = DaprProcessInfo.FromKernelProcess(this._process);
         //await this._daprProcess.InitializeProcessAsync(daprProcess, null, eventProxyStepId?.GetId()).ConfigureAwait(false);
         //await this._daprProcess.RunOnceAsync(initialEvent.ToJson()).ConfigureAwait(false);
