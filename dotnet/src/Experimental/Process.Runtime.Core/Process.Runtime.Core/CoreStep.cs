@@ -16,7 +16,7 @@ using Process.Runtime.Core;
 namespace Microsoft.SemanticKernel;
 
 [TypeSubscription("default")]
-internal class CoreStep : BaseAgent, IKernelProcessMessageChannel
+internal class CoreStep : BaseAgent, IKernelProcessMessageChannel, IHandle<InitializeStep>, IHandle<PrepareIncomingMessages, PrepareIncomingMessagesResponse>, IHandle<ToProcessStepInfo, ProcessStepInfo>, IHandle<ProcessIncomingMessages>
 {
     private readonly Lazy<ValueTask> _activateTask;
     private readonly IAgentRuntime _runtime;
@@ -58,6 +58,7 @@ internal class CoreStep : BaseAgent, IKernelProcessMessageChannel
         this._id = id;
         this._kernel = kernel;
         this._runtime = runtime;
+        this._activateTask = new Lazy<ValueTask>(this.ActivateStepAsync);
     }
 
     #region Public Actor Methods
@@ -92,7 +93,7 @@ internal class CoreStep : BaseAgent, IKernelProcessMessageChannel
     //    //await this.StateManager.SaveStateAsync().ConfigureAwait(false);
     //}
 
-    public virtual async Task HandleAsync(InitializeStep initializaMessage)
+    public virtual async ValueTask HandleAsync(InitializeStep initializaMessage, MessageContext messageContext)
     {
         Verify.NotNull(initializaMessage.StepInfo, nameof(initializaMessage.StepInfo));
 
@@ -174,11 +175,11 @@ internal class CoreStep : BaseAgent, IKernelProcessMessageChannel
     /// </summary>
     /// <returns>A <see cref="Task{Task}"/> where T is an <see cref="int"/> indicating the number of messages that are prepared for processing.</returns>
     //public async Task<int> PrepareIncomingMessagesAsync()
-    public async Task<PrepareIncomingMessagesResponse> HandleAsync(PrepareIncomingMessages prepareMessage)
+    public async ValueTask<PrepareIncomingMessagesResponse> HandleAsync(PrepareIncomingMessages item, MessageContext messageContext)
     {
         //IMessageBuffer messageQueue = this.ProxyFactory.CreateActorProxy<IMessageBuffer>(new ActorId(this.Id.GetId()), nameof(MessageBufferActor));
 
-        AgentId messageQueueId = new AgentId("MessageBuffer", this._id.Key);
+        AgentId messageQueueId = new AgentId(nameof(MessageBufferAgent), this._id.Key);
 
         // IList<string> incoming = await messageQueue.DequeueAllAsync().ConfigureAwait(false);
         object? incoming = await this._runtime.SendMessageAsync(new DequeueMessage(), messageQueueId).ConfigureAwait(false);
@@ -214,7 +215,7 @@ internal class CoreStep : BaseAgent, IKernelProcessMessageChannel
     /// </summary>
     /// <returns>A <see cref="Task"/></returns>
     //public async Task ProcessIncomingMessagesAsync()
-    public async Task HandleAsync(ProcessIncomingMessages processMessage)
+    public virtual async ValueTask HandleAsync(ProcessIncomingMessages item, MessageContext messageContext)
     {
         // Handle all the incoming messages one at a time
         while (this._incomingMessages.Count > 0)
@@ -233,7 +234,7 @@ internal class CoreStep : BaseAgent, IKernelProcessMessageChannel
     /// Extracts the current state of the step and returns it as a <see cref="ProcessStepInfo"/>.
     /// </summary>
     /// <returns>An instance of <see cref="ProcessStepInfo"/></returns>
-    public virtual async Task<ProcessStepInfo> HandleAsync(ToProcessStepInfo request)
+    public virtual async ValueTask<ProcessStepInfo> HandleAsync(ToProcessStepInfo item, MessageContext messageContext)
     {
         // Lazy one-time initialization of the step before extracting state information.
         // This allows state information to be extracted even if the step has not been activated.
@@ -288,10 +289,10 @@ internal class CoreStep : BaseAgent, IKernelProcessMessageChannel
     /// <returns>A <see cref="ValueTask"/></returns>
     public ValueTask EmitEventAsync(KernelProcessEvent processEvent) => this.EmitEventAsync(ProcessEvent.Create(processEvent, this._eventNamespace!));
 
-    internal virtual Task HandleAsync(ProcessMessageCore message)
-    {
-        return this.HandleAsync(message);
-    }
+    //internal virtual Task HandleAsync(ProcessMessageCore message)
+    //{
+    //    return this.HandleAsync(message);
+    //}
 
     /// <summary>
     /// Handles a <see cref="ProcessMessage"/> that has been sent to the step.
@@ -438,7 +439,7 @@ internal class CoreStep : BaseAgent, IKernelProcessMessageChannel
         Type? stateType = null;
 
         // Check if the state has already been persisted
-        bool? stepStateType = false; // TODO: State
+        bool? stepStateType = null; // TODO: State
         // var stepStateType = await this.StateManager.TryGetStateAsync<string>(ActorStateKeys.StepStateType).ConfigureAwait(false);
         if (stepStateType.HasValue)
         {
@@ -450,9 +451,9 @@ internal class CoreStep : BaseAgent, IKernelProcessMessageChannel
         else
         {
             stateType = this._innerStepType.ExtractStateType(out Type? userStateType, this._logger);
-            //stateObject = this._stepInfo.State;
+            stateObject = this._stepInfo.State.ToKernelProcessStepState(this._innerStepType);
 
-            stateObject = JsonSerializer.Deserialize(this._stepInfo.State.State, stateType!) as KernelProcessStepState;
+            //stateObject = JsonSerializer.Deserialize(this._stepInfo.State.State, stateType!) as KernelProcessStepState;
 
             // Persist the state type and type object. TODO: State
             //await this.StateManager.AddStateAsync(ActorStateKeys.StepStateType, stateType.AssemblyQualifiedName).ConfigureAwait(false);

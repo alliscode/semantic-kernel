@@ -48,7 +48,7 @@ message ProcessFunctionTarget {
     string step_id = 1;
     string function_name = 2;
     string parameter_name = 3;
-    string target_event_id = 4;
+    optional string target_event_id = 4;
 }
 
 message ProcessEdgeList {

@@ -20,12 +20,16 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.AutoGen.Core" />
+    <!--<PackageReference Include="Microsoft.AutoGen.Core" />
+    <PackageReference Include="Microsoft.AutoGen.Core.Grpc" />-->
+    <PackageReference Include="Microsoft.Extensions.Configuration" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" />
     <PackageReference Include="Microsoft.VisualStudio.Threading" />
     <PackageReference Include="System.Threading.Channels" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\..\..\..\..\autogen\dotnet\src\Microsoft.AutoGen\Core\Microsoft.AutoGen.Core.csproj" />
     <ProjectReference Include="..\..\Process.Abstractions\Process.Abstractions.csproj" />
     <ProjectReference Include="..\..\Process.Core\Process.Core.csproj" />
   </ItemGroup>

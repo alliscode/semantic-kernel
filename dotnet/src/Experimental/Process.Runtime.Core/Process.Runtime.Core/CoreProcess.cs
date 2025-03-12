@@ -1,12 +1,6 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using System.Threading;
 using System.Threading.Channels;
-using System.Threading.Tasks;
 using Microsoft.AutoGen.Contracts;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -18,7 +12,7 @@ using Process.Runtime.Core;
 
 namespace Microsoft.SemanticKernel;
 
-internal sealed class CoreProcess : CoreStep, IDisposable
+internal sealed class CoreProcess : CoreStep, IDisposable, IHandle<RunOnce>, IHandle<ToProcessStepInfo, ProcessStepInfo>
 {
     private readonly JoinableTaskFactory _joinableTaskFactory;
     private readonly JoinableTaskContext _joinableTaskContext;
@@ -54,7 +48,7 @@ internal sealed class CoreProcess : CoreStep, IDisposable
     #region Public Actor Methods
 
     //public async Task InitializeProcessAsync(ProcessStepInfo processInfo, string? parentProcessId, string? eventProxyStepId = null)
-    public override async Task HandleAsync(InitializeStep initializeRequest)
+    public override async ValueTask HandleAsync(InitializeStep initializeRequest, MessageContext messageContext)
     {
         Verify.NotNull(initializeRequest);
 
@@ -109,7 +103,7 @@ internal sealed class CoreProcess : CoreStep, IDisposable
     /// </summary>
     /// <param name="processEvent">Required. The <see cref="KernelProcessEvent"/> to start the process with.</param>
     /// <returns>A <see cref="Task"/></returns>
-    private async Task RunOnceAsync(string processEvent)
+    private async ValueTask RunOnceAsync(string processEvent)
     {
         Verify.NotNull(processEvent, nameof(processEvent));
 
@@ -123,7 +117,7 @@ internal sealed class CoreProcess : CoreStep, IDisposable
         await this._processTask!.JoinAsync().ConfigureAwait(false);
     }
 
-    public Task HandleAsync(RunOnce message)
+    public ValueTask HandleAsync(RunOnce message, MessageContext messageContext)
     {
         return this.RunOnceAsync(message.Event);
     }
@@ -177,9 +171,9 @@ internal sealed class CoreProcess : CoreStep, IDisposable
     //    return await this.ToDaprProcessInfoAsync().ConfigureAwait(false);
     //}
 
-    public async Task<ProcessStepInfo> HandleAsync(ProcessInfoRequest request, CancellationToken cancellationToken)
+    public async ValueTask<ProcessStepInfo> HandleAsync(ToProcessStepInfo request, MessageContext messageContext)
     {
-        var processInfo = await this.ToProcessInfoAsync(cancellationToken).ConfigureAwait(false);
+        var processInfo = await this.ToProcessInfoAsync(messageContext.CancellationToken).ConfigureAwait(false);
         return processInfo;
     }
 
@@ -221,7 +215,7 @@ internal sealed class CoreProcess : CoreStep, IDisposable
     /// entire sub-process should be executed within a single superstep.
     /// </summary>
     /// <param name="message">The message to process.</param>
-    internal override async Task HandleAsync(ProcessMessageCore message)
+    internal override async Task HandleMessageAsync(ProcessMessageCore message)
     {
         if (string.IsNullOrWhiteSpace(message.TargetEventId))
         {
@@ -445,7 +439,8 @@ internal sealed class CoreProcess : CoreStep, IDisposable
             _ => nameof(CoreStep)
         };
 
-        var response = await this._runtime.SendMessageAsync(new PrepareIncomingMessages(), new AgentId(agentType, step.State.Id), cancellationToken: cancellationToken).ConfigureAwait(false);
+        var scopedStepId = this.ScopedActorId(new AgentId(agentType, step.State.Id!));
+        var response = await this._runtime.SendMessageAsync(new PrepareIncomingMessages(), scopedStepId, cancellationToken: cancellationToken).ConfigureAwait(false);
         if (response is not PrepareIncomingMessagesResponse prepareResponse)
         {
             throw new KernelException("The response from the PrepareIncomingMessages was not of the expected type.").Log(this._logger);
@@ -463,7 +458,8 @@ internal sealed class CoreProcess : CoreStep, IDisposable
             _ => nameof(CoreStep)
         };
 
-        await this._runtime.SendMessageAsync(new ProcessIncomingMessages(), new AgentId(agentType, step.State.Id), cancellationToken: cancellationToken).ConfigureAwait(false);
+        var scopedStepId = this.ScopedActorId(new AgentId(agentType, step.State.Id!));
+        await this._runtime.SendMessageAsync(new ProcessIncomingMessages(), scopedStepId, cancellationToken: cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -490,12 +486,12 @@ internal sealed class CoreProcess : CoreStep, IDisposable
             {
                 foreach (ProcessEdge edge in edges)
                 {
-                    KernelProcessEdge kernelProcessEdge = new(edge.SourceStepId, new KernelProcessFunctionTarget(edge.OutputTarget.StepId, edge.OutputTarget.FunctionName));
+                    KernelProcessEdge kernelProcessEdge = new(edge.SourceStepId, new KernelProcessFunctionTarget(edge.OutputTarget.StepId, edge.OutputTarget.FunctionName, parameterName: edge.OutputTarget.ParameterName, targetEventId: edge.OutputTarget.TargetEventId));
                     ProcessMessage message = ProcessMessageFactory.CreateFromEdge(kernelProcessEdge, externalEvent.Data);
                     var scopedMessageBufferId = this.ScopedActorId(new AgentId(nameof(MessageBufferAgent), edge.OutputTarget.StepId));
                     //var messageQueue = this.ProxyFactory.CreateActorProxy<IMessageBuffer>(scopedMessageBufferId, nameof(MessageBufferActor));
-                    var messageQueueId = new AgentId(nameof(MessageBufferAgent), scopedMessageBufferId.Key);
-                    await this._runtime.SendMessageAsync(new EnqueueMessage() { Content = message.ToJson() }, messageQueueId).ConfigureAwait(false);
+                    //var messageQueueId = new AgentId(nameof(MessageBufferAgent), scopedMessageBufferId.Key);
+                    await this._runtime.SendMessageAsync(new EnqueueMessage() { Content = message.ToJson() }, scopedMessageBufferId).ConfigureAwait(false);
                     //await messageQueue.EnqueueAsync(message.ToJson()).ConfigureAwait(false);
                 }
             }
@@ -594,7 +590,7 @@ internal sealed class CoreProcess : CoreStep, IDisposable
     /// <returns>True if the end message has been sent, otherwise false.</returns>
     private async Task<bool> IsEndMessageSentAsync()
     {
-        var scopedMessageBufferId = this.ScopedActorId(new AgentId("MessageBuffer", ProcessConstants.EndStepName));
+        var scopedMessageBufferId = this.ScopedActorId(new AgentId(nameof(MessageBufferAgent), ProcessConstants.EndStepName));
         //var endMessageQueue = this.ProxyFactory.CreateActorProxy<IMessageBuffer>(scopedMessageBufferId, nameof(MessageBufferActor));
 
         //var messages = await endMessageQueue.DequeueAllAsync().ConfigureAwait(false);
@@ -629,13 +625,14 @@ internal sealed class CoreProcess : CoreStep, IDisposable
             _ => nameof(CoreStep)
         };
 
-        var response = await this._runtime.SendMessageAsync(new ToProcessStepInfo(), new AgentId(agentType, step.State.Id), cancellationToken: cancellationToken).ConfigureAwait(false);
-        if (response is not ToProcessStepInfoResponse stepInfoResponse)
+        var scopedStepId = this.ScopedActorId(new AgentId(agentType, step.State.Id!));
+        var response = await this._runtime.SendMessageAsync(new ToProcessStepInfo(), scopedStepId, cancellationToken: cancellationToken).ConfigureAwait(false);
+        if (response is not ProcessStepInfo stepInfoResponse)
         {
             throw new KernelException("The response from the PrepareIncomingMessages was not of the expected type.").Log(this._logger);
         }
 
-        return stepInfoResponse.StepInfo;
+        return stepInfoResponse;
     }
 
     /// <summary>

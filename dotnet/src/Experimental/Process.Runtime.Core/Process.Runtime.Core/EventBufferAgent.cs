@@ -6,7 +6,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel.Process.Serialization;
 
 namespace Process.Runtime.Core;
-public class EventBufferAgent : BaseAgent
+public class EventBufferAgent : BaseAgent, IHandle<DequeueMessage, DequeueMessageResponse>, IHandle<EnqueueMessage>
 {
     private readonly List<string> _queue = [];
 
@@ -14,11 +14,16 @@ public class EventBufferAgent : BaseAgent
     {
     }
 
-    /// <summary>
-    /// Dequeues an event.
-    /// </summary>
-    /// <returns>A <see cref="List{T}"/> where T is <see cref="ProcessEvent"/></returns>
-    public async Task<DequeueMessageResponse> DequeueAllAsync()
+    public async Task EnqueueAsync(EnqueueMessage message)
+    {
+        this._queue.Add(message.Content);
+
+        // Save the state.
+        //await this.StateManager.SetStateAsync(ActorStateKeys.ExternalEventQueueState, this._queue).ConfigureAwait(false);
+        //await this.StateManager.SaveStateAsync().ConfigureAwait(false);
+    }
+
+    public ValueTask<DequeueMessageResponse> HandleAsync(DequeueMessage item, MessageContext messageContext)
     {
         // Dequeue and clear the queue.
         var response = new DequeueMessageResponse();
@@ -29,15 +34,17 @@ public class EventBufferAgent : BaseAgent
         //await this.StateManager.SetStateAsync(ActorStateKeys.ExternalEventQueueState, this._queue).ConfigureAwait(false);
         //await this.StateManager.SaveStateAsync().ConfigureAwait(false);
 
-        return response;
+        return ValueTask.FromResult(response);
     }
 
-    public async Task EnqueueAsync(EnqueueMessage message)
+    public ValueTask HandleAsync(EnqueueMessage item, MessageContext messageContext)
     {
-        this._queue.Add(message.Content);
+        this._queue.Add(item.Content);
 
         // Save the state.
         //await this.StateManager.SetStateAsync(ActorStateKeys.ExternalEventQueueState, this._queue).ConfigureAwait(false);
         //await this.StateManager.SaveStateAsync().ConfigureAwait(false);
+
+        return ValueTask.CompletedTask;
     }
 }

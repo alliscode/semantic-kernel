@@ -6,7 +6,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel.Process.Serialization;
 
 namespace Process.Runtime.Core;
-internal class MessageBufferAgent : BaseAgent
+internal class MessageBufferAgent : BaseAgent, IHandle<DequeueMessage, DequeueMessageResponse>, IHandle<EnqueueMessage>
 {
     private readonly List<string> _queue = [];
 
@@ -25,6 +25,11 @@ internal class MessageBufferAgent : BaseAgent
 
     public async ValueTask<DequeueMessageResponse> HandleAsync(DequeueMessage message, MessageContext messageContext)
     {
+        if (this._queue.Count > 0)
+        {
+            int x = 3;
+        }
+
         // Dequeue and clear the queue.
         string[] items = [.. this._queue];
         this._queue.Clear();

@@ -6,7 +6,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel.Process.Serialization;
 
 namespace Process.Runtime.Core;
-public class ExternalMessageBufferAgent : BaseAgent
+public class ExternalMessageBufferAgent : BaseAgent, IHandle<DequeueMessage, DequeueMessageResponse>, IHandle<EnqueueMessage>
 {
     private readonly List<string> _queue = [];
 
@@ -18,7 +18,7 @@ public class ExternalMessageBufferAgent : BaseAgent
     /// Dequeues an event.
     /// </summary>
     /// <returns>A <see cref="List{T}"/> where T is <see cref="ProcessEvent"/></returns>
-    public async Task<DequeueMessageResponse> DequeueAllAsync()
+    public async ValueTask<DequeueMessageResponse> HandleAsync(DequeueMessage message, MessageContext messageContext)
     {
         // Dequeue and clear the queue.
         var response = new DequeueMessageResponse();
@@ -32,7 +32,7 @@ public class ExternalMessageBufferAgent : BaseAgent
         return response;
     }
 
-    public async Task EnqueueAsync(EnqueueMessage message)
+    public async ValueTask HandleAsync(EnqueueMessage message, MessageContext messageContext)
     {
         this._queue.Add(message.Content);
 

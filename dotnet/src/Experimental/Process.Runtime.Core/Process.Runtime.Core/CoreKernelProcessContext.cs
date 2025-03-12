@@ -15,7 +15,7 @@ public class CoreKernelProcessContext : KernelProcessContext
 {
     private readonly KernelProcess _process;
     private readonly AgentId _processAgentId;
-    private readonly IAgentRuntime _agentRuntime;
+    private readonly InProcessRuntime _agentRuntime;
 
     internal CoreKernelProcessContext(KernelProcess process)
     {
@@ -40,13 +40,23 @@ public class CoreKernelProcessContext : KernelProcessContext
                 return ValueTask.FromResult<IHostableAgent>(new CoreProcess(id, runtime, new Kernel()));
             }).ConfigureAwait(false);
 
+        await this._agentRuntime.RegisterImplicitAgentSubscriptionsAsync(nameof(CoreProcess), typeof(CoreProcess)).ConfigureAwait(false);
+
         await this._agentRuntime.RegisterAgentFactoryAsync(
             type: nameof(CoreStep), (AgentId id, IAgentRuntime runtime) =>
             {
                 return ValueTask.FromResult<IHostableAgent>(new CoreStep(id, runtime, new Kernel()));
             }).ConfigureAwait(false);
 
-        // EventBufferAgent, ExternalEventBufferAgent, and ExternalMessageBufferAgent
+        await this._agentRuntime.RegisterImplicitAgentSubscriptionsAsync(nameof(CoreStep), typeof(CoreStep)).ConfigureAwait(false);
+
+        await this._agentRuntime.RegisterAgentFactoryAsync(
+            type: nameof(MessageBufferAgent), (AgentId id, IAgentRuntime runtime) =>
+            {
+                return ValueTask.FromResult<IHostableAgent>(new MessageBufferAgent(id, runtime, ""));
+            }).ConfigureAwait(false);
+
+        await this._agentRuntime.RegisterImplicitAgentSubscriptionsAsync<MessageBufferAgent>(nameof(EventBufferAgent)).ConfigureAwait(false);
 
         await this._agentRuntime.RegisterAgentFactoryAsync(
             type: nameof(EventBufferAgent), (AgentId id, IAgentRuntime runtime) =>
@@ -54,17 +64,26 @@ public class CoreKernelProcessContext : KernelProcessContext
                 return ValueTask.FromResult<IHostableAgent>(new EventBufferAgent(id, runtime, ""));
             }).ConfigureAwait(false);
 
+        await this._agentRuntime.RegisterImplicitAgentSubscriptionsAsync<EventBufferAgent>(nameof(EventBufferAgent)).ConfigureAwait(false);
+
         await this._agentRuntime.RegisterAgentFactoryAsync(
             type: nameof(ExternalEventBufferAgent), (AgentId id, IAgentRuntime runtime) =>
             {
                 return ValueTask.FromResult<IHostableAgent>(new ExternalEventBufferAgent(id, runtime, ""));
             }).ConfigureAwait(false);
 
+        await this._agentRuntime.RegisterImplicitAgentSubscriptionsAsync<ExternalEventBufferAgent>(nameof(ExternalEventBufferAgent)).ConfigureAwait(false);
+
         await this._agentRuntime.RegisterAgentFactoryAsync(
             type: nameof(ExternalMessageBufferAgent), (AgentId id, IAgentRuntime runtime) =>
             {
                 return ValueTask.FromResult<IHostableAgent>(new ExternalMessageBufferAgent(id, runtime, ""));
             }).ConfigureAwait(false);
+
+        await this._agentRuntime.RegisterImplicitAgentSubscriptionsAsync<ExternalMessageBufferAgent>(nameof(ExternalMessageBufferAgent)).ConfigureAwait(false);
+
+        await this._agentRuntime.StartAsync().ConfigureAwait(false);
+
     }
 
     /// <summary>
@@ -81,11 +100,12 @@ public class CoreKernelProcessContext : KernelProcessContext
         //await this._daprProcess.RunOnceAsync(initialEvent.ToJson()).ConfigureAwait(false);
 
         var process = this._process.ToProcessStepInfo();
+
         await this._agentRuntime.SendMessageAsync(
             new InitializeStep
             {
                 StepInfo = process,
-                EventProxyStepId = eventProxyStepId?.Key
+                EventProxyStepId = eventProxyStepId?.Key ?? string.Empty,
             },
             this._processAgentId
             ).ConfigureAwait(false);
@@ -133,12 +153,12 @@ public class CoreKernelProcessContext : KernelProcessContext
             this._processAgentId
             ).ConfigureAwait(false);
 
-        if (result is not ToProcessStepInfoResponse processInfo)
+        if (result is not ProcessStepInfo processInfo)
         {
             throw new KernelException($"Unable to get process state from {nameof(CoreKernelProcessContext)}");
         }
 
-        return null;
+        return processInfo.ToKernelProcess();
     }
 
     /// <inheritdoc/>
