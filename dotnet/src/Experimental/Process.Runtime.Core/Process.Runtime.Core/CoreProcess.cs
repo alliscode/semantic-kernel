@@ -27,15 +27,17 @@ internal sealed class CoreProcess : CoreStep, IDisposable, IHandle<RunOnce>, IHa
     private JoinableTask? _processTask;
     private CancellationTokenSource? _processCancelSource;
     private bool _isInitialized;
-    private ILogger? _logger;
+    private ILogger? _processLogger;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="ProcessActor"/> class.
+    /// Initializes a new instance of the <see cref="CoreProcess"/> class.
     /// </summary>
-    /// <param name="host">The Dapr host actor</param>
+    /// <param name="id">The unique Id of the processes</param>
+    /// <param name="runtime">The runtime.</param>
     /// <param name="kernel">An instance of <see cref="Kernel"/></param>
-    public CoreProcess(AgentId id, IAgentRuntime runtime, Kernel kernel)
-        : base(id, runtime, kernel)
+    /// <param name="logger">Optional. An instance of <see cref="ILogger"/></param>
+    public CoreProcess(AgentId id, IAgentRuntime runtime, Kernel kernel, ILogger<CoreProcess>? logger = null)
+        : base(id, runtime, kernel, logger)
     {
         this._id = id;
         this._runtime = runtime;
@@ -43,6 +45,7 @@ internal sealed class CoreProcess : CoreStep, IDisposable, IHandle<RunOnce>, IHa
         this._externalEventChannel = Channel.CreateUnbounded<KernelProcessEvent>();
         this._joinableTaskContext = new JoinableTaskContext();
         this._joinableTaskFactory = new JoinableTaskFactory(this._joinableTaskContext);
+        this._processLogger = logger ?? new NullLogger<CoreProcess>();
     }
 
     #region Public Actor Methods
@@ -54,7 +57,7 @@ internal sealed class CoreProcess : CoreStep, IDisposable, IHandle<RunOnce>, IHa
 
         if (initializeRequest.StepInfo.StepTypeInfoCase != ProcessStepInfo.StepTypeInfoOneofCase.Process || initializeRequest.StepInfo.Process?.Steps == null)
         {
-            throw new KernelException("The process must be of type 'Process'").Log(this._logger);
+            throw new KernelException("The process must be of type 'Process'").Log(this._processLogger);
         }
 
         // Only initialize once. This check is required as the actor can be re-activated from persisted state and
@@ -87,7 +90,7 @@ internal sealed class CoreProcess : CoreStep, IDisposable, IHandle<RunOnce>, IHa
     {
         if (!this._isInitialized)
         {
-            throw new InvalidOperationException("The process cannot be started before it has been initialized.").Log(this._logger);
+            throw new InvalidOperationException("The process cannot be started before it has been initialized.").Log(this._processLogger);
         }
 
         this._processCancelSource = new CancellationTokenSource();
@@ -205,7 +208,7 @@ internal sealed class CoreProcess : CoreStep, IDisposable, IHandle<RunOnce>, IHa
     /// <summary>
     /// The name of the step.
     /// </summary>
-    protected override string Name => this._process?.State.Name ?? throw new KernelException("The Process must be initialized before accessing the Name property.").Log(this._logger);
+    protected override string Name => this._process?.State.Name ?? throw new KernelException("The Process must be initialized before accessing the Name property.").Log(this._processLogger);
 
     #endregion
 
@@ -219,7 +222,7 @@ internal sealed class CoreProcess : CoreStep, IDisposable, IHandle<RunOnce>, IHa
     {
         if (string.IsNullOrWhiteSpace(message.TargetEventId))
         {
-            throw new KernelException("Internal Process Error: The target event id must be specified when sending a message to a step.").Log(this._logger);
+            throw new KernelException("Internal Process Error: The target event id must be specified when sending a message to a step.").Log(this._processLogger);
         }
 
         string eventId = message.TargetEventId!;
@@ -259,7 +262,7 @@ internal sealed class CoreProcess : CoreStep, IDisposable, IHandle<RunOnce>, IHa
         this.ParentProcessId = parentProcessId;
         this._process = processInfo;
         this._stepsInfos = [.. this._process.Process.Steps];
-        this._logger = this._kernel.LoggerFactory?.CreateLogger(this._process.State.Name) ?? new NullLogger<CoreProcess>();
+        this._processLogger = this._kernel.LoggerFactory?.CreateLogger(this._process.State.Name) ?? new NullLogger<CoreProcess>();
         if (!string.IsNullOrWhiteSpace(eventProxyStepId))
         {
             this.EventProxyStepId = new AgentId("", eventProxyStepId);
@@ -271,8 +274,6 @@ internal sealed class CoreProcess : CoreStep, IDisposable, IHandle<RunOnce>, IHa
         // Initialize the steps within this process
         foreach (var step in this._stepsInfos)
         {
-            AgentId? stepAgentId = null;
-
             // The current step should already have a name.
             Verify.NotNull(step.State?.Name);
 
@@ -286,9 +287,6 @@ internal sealed class CoreProcess : CoreStep, IDisposable, IHandle<RunOnce>, IHa
                     }
 
                     // Initialize the step as a process.
-                    var scopedProcessId = this.ScopedActorId(new AgentId(nameof(CoreProcess), step.State.Id!));
-                    //var processActor = this.ProxyFactory.CreateActorProxy<IProcess>(scopedProcessId, nameof(ProcessActor));
-
                     var initializeMessage = new InitializeStep
                     {
                         StepInfo = step,
@@ -296,11 +294,8 @@ internal sealed class CoreProcess : CoreStep, IDisposable, IHandle<RunOnce>, IHa
                         EventProxyStepId = eventProxyStepId
                     };
 
+                    var scopedProcessId = this.ScopedActorId(new AgentId(nameof(CoreProcess), step.State.Id!));
                     await this._runtime.SendMessageAsync(initializeMessage, scopedProcessId).ConfigureAwait(false);
-
-
-                    //await processActor.InitializeProcessAsync(processStep, this.Id.GetId(), eventProxyStepId).ConfigureAwait(false);
-                    //stepActor = this.ProxyFactory.CreateActorProxy<IStep>(scopedProcessId, nameof(ProcessActor));
                     break;
 
                 case ProcessStepInfo.StepTypeInfoOneofCase.Map:
@@ -327,9 +322,6 @@ internal sealed class CoreProcess : CoreStep, IDisposable, IHandle<RunOnce>, IHa
                     Verify.NotNull(step.State?.Id);
 
                     var scopedStepId = this.ScopedActorId(new AgentId(nameof(CoreStep), step.State.Id!));
-                    //stepActor = this.ProxyFactory.CreateActorProxy<IStep>(scopedStepId, nameof(StepActor));
-                    //await stepActor.InitializeStepAsync(step, this.Id.GetId(), eventProxyStepId).ConfigureAwait(false);
-
                     var initializeStepMessage = new InitializeStep
                     {
                         StepInfo = step,
@@ -341,39 +333,6 @@ internal sealed class CoreProcess : CoreStep, IDisposable, IHandle<RunOnce>, IHa
 
                     break;
             }
-
-            //if (step is DaprProcessInfo processStep)
-            //{
-            //    // The process will only have an Id if its already been executed.
-            //    if (string.IsNullOrWhiteSpace(processStep.State.Id))
-            //    {
-            //        processStep = processStep with { State = processStep.State with { Id = Guid.NewGuid().ToString() } };
-            //    }
-
-            //    // Initialize the step as a process.
-            //    var scopedProcessId = this.ScopedActorId(new AgentId("CoreStep", processStep.State.Id!));
-            //    var processActor = this.ProxyFactory.CreateActorProxy<IProcess>(scopedProcessId, nameof(ProcessActor));
-            //    await processActor.InitializeProcessAsync(processStep, this.Id.GetId(), eventProxyStepId).ConfigureAwait(false);
-            //    //stepActor = this.ProxyFactory.CreateActorProxy<IStep>(scopedProcessId, nameof(ProcessActor));
-            //    stepAgentId = 
-            //}
-            //else if (step is DaprMapInfo mapStep)
-            //{
-            //    // Initialize the step as a map.
-            //    ActorId scopedMapId = this.ScopedActorId(new ActorId(mapStep.State.Id!));
-            //    IMap mapActor = this.ProxyFactory.CreateActorProxy<IMap>(scopedMapId, nameof(MapActor));
-            //    await mapActor.InitializeMapAsync(mapStep, this.Id.GetId()).ConfigureAwait(false);
-            //    stepActor = this.ProxyFactory.CreateActorProxy<IStep>(scopedMapId, nameof(MapActor));
-            //}
-            //else
-            //{
-            //    // The current step should already have an Id.
-            //    Verify.NotNull(step.State?.Id);
-
-            //    var scopedStepId = this.ScopedActorId(new ActorId(step.State.Id!));
-            //    stepActor = this.ProxyFactory.CreateActorProxy<IStep>(scopedStepId, nameof(StepActor));
-            //    await stepActor.InitializeStepAsync(step, this.Id.GetId(), eventProxyStepId).ConfigureAwait(false);
-            //}
 
             this._steps.Add(step);
         }
@@ -414,7 +373,7 @@ internal sealed class CoreProcess : CoreStep, IDisposable, IHandle<RunOnce>, IHa
         }
         catch (Exception ex)
         {
-            this._logger?.LogError(ex, "An error occurred while running the process: {ErrorMessage}.", ex.Message);
+            this._processLogger?.LogError(ex, "An error occurred while running the process: {ErrorMessage}.", ex.Message);
             throw;
         }
         finally
@@ -443,7 +402,7 @@ internal sealed class CoreProcess : CoreStep, IDisposable, IHandle<RunOnce>, IHa
         var response = await this._runtime.SendMessageAsync(new PrepareIncomingMessages(), scopedStepId, cancellationToken: cancellationToken).ConfigureAwait(false);
         if (response is not PrepareIncomingMessagesResponse prepareResponse)
         {
-            throw new KernelException("The response from the PrepareIncomingMessages was not of the expected type.").Log(this._logger);
+            throw new KernelException("The response from the PrepareIncomingMessages was not of the expected type.").Log(this._processLogger);
         }
 
         return prepareResponse.MessageCount;
@@ -474,7 +433,7 @@ internal sealed class CoreProcess : CoreStep, IDisposable, IHandle<RunOnce>, IHa
         var dequeueEventsResult = await this._runtime.SendMessageAsync(new DequeueMessage(), externalEventBufferId).ConfigureAwait(false);
         if (dequeueEventsResult is not DequeueMessageResponse dequeueResponse)
         {
-            throw new KernelException("The response from the DequeueExternalEvents was not of the expected type.").Log(this._logger);
+            throw new KernelException("The response from the DequeueExternalEvents was not of the expected type.").Log(this._processLogger);
         }
 
         IList<string> dequeuedEvents = dequeueResponse.Messages;
@@ -509,7 +468,7 @@ internal sealed class CoreProcess : CoreStep, IDisposable, IHandle<RunOnce>, IHa
         var errorDequeueResult = await this._runtime.SendMessageAsync(new DequeueMessage(), errorEventQueueId).ConfigureAwait(false);
         if (errorDequeueResult is not DequeueMessageResponse errorDequeueResponse)
         {
-            throw new KernelException("The response from the DequeueGlobalErrorEvents was not of the expected type.").Log(this._logger);
+            throw new KernelException("The response from the DequeueGlobalErrorEvents was not of the expected type.").Log(this._processLogger);
         }
 
         IList<string> errorEvents = errorDequeueResponse.Messages; //await errorEventQueue.DequeueAllAsync().ConfigureAwait(false);
@@ -559,7 +518,7 @@ internal sealed class CoreProcess : CoreStep, IDisposable, IHandle<RunOnce>, IHa
             var dequeueResult = await this._runtime.SendMessageAsync(new DequeueMessage(), eventBufferId).ConfigureAwait(false);
             if (dequeueResult is not DequeueMessageResponse dequeueResponse)
             {
-                throw new KernelException("The response from the DequeuePublicEvents was not of the expected type.").Log(this._logger);
+                throw new KernelException("The response from the DequeuePublicEvents was not of the expected type.").Log(this._processLogger);
             }
 
             IList<string> allEvents = dequeueResponse.Messages;
@@ -597,7 +556,7 @@ internal sealed class CoreProcess : CoreStep, IDisposable, IHandle<RunOnce>, IHa
         var dequeueResult = await this._runtime.SendMessageAsync(new DequeueMessage(), scopedMessageBufferId).ConfigureAwait(false);
         if (dequeueResult is not DequeueMessageResponse dequeueResponse)
         {
-            throw new KernelException("The response from the DequeuePublicEvents was not of the expected type.").Log(this._logger);
+            throw new KernelException("The response from the DequeuePublicEvents was not of the expected type.").Log(this._processLogger);
         }
 
         return dequeueResponse.Messages.Count > 0;
@@ -629,7 +588,7 @@ internal sealed class CoreProcess : CoreStep, IDisposable, IHandle<RunOnce>, IHa
         var response = await this._runtime.SendMessageAsync(new ToProcessStepInfo(), scopedStepId, cancellationToken: cancellationToken).ConfigureAwait(false);
         if (response is not ProcessStepInfo stepInfoResponse)
         {
-            throw new KernelException("The response from the PrepareIncomingMessages was not of the expected type.").Log(this._logger);
+            throw new KernelException("The response from the PrepareIncomingMessages was not of the expected type.").Log(this._processLogger);
         }
 
         return stepInfoResponse;
