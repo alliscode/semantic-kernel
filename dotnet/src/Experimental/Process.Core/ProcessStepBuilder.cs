@@ -96,6 +96,11 @@ public abstract class ProcessStepBuilder
     internal abstract KernelProcessStepInfo BuildStep(KernelProcessStepStateMetadata? stateMetadata = null);
 
     /// <summary>
+    /// The process builder that this step belongs to.
+    /// </summary>
+    internal ProcessBuilder? ProcessBuilder { get; set; }
+
+    /// <summary>
     /// Resolves the function name for the step.
     /// </summary>
     /// <returns></returns>
@@ -214,7 +219,8 @@ public abstract class ProcessStepBuilder
     /// Initializes a new instance of the <see cref="ProcessStepBuilder"/> class.
     /// </summary>
     /// <param name="name">The name of the step.</param>
-    protected ProcessStepBuilder(string name)
+    /// <param name="processBuilder">The process builder that this step belongs to.</param>
+    protected ProcessStepBuilder(string name, ProcessBuilder? processBuilder)
     {
         this.Name ??= name;
         Verify.NotNullOrWhiteSpace(name);
@@ -223,6 +229,7 @@ public abstract class ProcessStepBuilder
         this.Id = Guid.NewGuid().ToString("n");
         this._eventNamespace = $"{this.Name}_{this.Id}";
         this.Edges = new Dictionary<string, List<ProcessStepEdgeBuilder>>(StringComparer.OrdinalIgnoreCase);
+        this.ProcessBuilder = processBuilder;
     }
 }
 
@@ -239,10 +246,11 @@ public class ProcessStepBuilder<TStep> : ProcessStepBuilder where TStep : Kernel
     /// <summary>
     /// Creates a new instance of the <see cref="ProcessStepBuilder"/> class. If a name is not provided, the name will be derived from the type of the step.
     /// </summary>
+    /// <param name="processBuilder">The process builder that this step belongs to.</param>
     /// <param name="name">Optional: The name of the step.</param>
     /// <param name="initialState">Initial state of the step to be used on the step building stage</param>
-    internal ProcessStepBuilder(string? name = null, object? initialState = default)
-        : base(name ?? typeof(TStep).Name)
+    internal ProcessStepBuilder(ProcessBuilder processBuilder, string? name = null, object? initialState = default)
+        : base(name ?? typeof(TStep).Name, processBuilder)
     {
         this.FunctionsDict = this.GetFunctionMetadataMap();
         this._initialState = initialState;

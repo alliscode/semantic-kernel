@@ -192,11 +192,11 @@ public sealed class ProcessCloudEventsTests : IClassFixture<ProcessTestFixture>
 
         echoStep
             .OnFunctionResult()
-            .EmitExternalEvent(proxyStep, MockTopicNames.EchoExternalTopic);
+            .EmitExternalEvent(MockTopicNames.EchoExternalTopic);
 
         repeatStep
             .OnEvent(ProcessTestsEvents.OutputReadyInternal)
-            .EmitExternalEvent(proxyStep, MockTopicNames.RepeatExternalTopic);
+            .EmitExternalEvent(MockTopicNames.RepeatExternalTopic);
 
         return processBuilder;
     }
@@ -214,7 +214,7 @@ public sealed class ProcessCloudEventsTests : IClassFixture<ProcessTestFixture>
 
         echoStep
             .OnFunctionResult()
-            .EmitExternalEvent(proxyStep, proxyTopicName);
+            .EmitExternalEvent(proxyTopicName);
 
         return process;
     }

@@ -75,16 +75,21 @@ public sealed class ProcessStepEdgeBuilder
     /// Emit the SK step event as an external event with specific topic name
     /// </summary>
     /// <returns></returns>
-    public ProcessStepEdgeBuilder EmitExternalEvent(ProcessProxyBuilder proxyStep, string topicName)
+    public ProcessStepEdgeBuilder EmitExternalEvent(string topicName, string? channelKey = null)
     {
         // 1. Link sk event and topic
-        proxyStep.LinkTopicToStepEdgeInfo(topicName, this.Source, this.EventData);
+        //proxyStep.LinkTopicToStepEdgeInfo(topicName, this.Source, this.EventData);
 
-        // 2. Regular SK step link step functions/edge connection
-        var targetBuilder = proxyStep.GetExternalFunctionTargetBuilder();
-
+        var processBuilder = this.Source.ProcessBuilder;
+        var targetBuilder = processBuilder.ExternalProxyStep.GetExternalFunctionTargetBuilder();
         return this.SendEventTo(targetBuilder);
     }
+
+    //public ProcessStepEdgeBuilder InterceptEvent(Action<KernelProcessEvent> eventHandler)
+    //{
+    //    // Generate a KernelFunction that call the event handler
+    //    // Add the kernel function to a LocalExecutor
+    //}
 
     /// <summary>
     /// Signals that the process should be stopped.

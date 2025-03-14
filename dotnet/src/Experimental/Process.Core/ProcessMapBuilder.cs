@@ -17,8 +17,9 @@ public sealed class ProcessMapBuilder : ProcessStepBuilder
     /// Initializes a new instance of the <see cref="ProcessMapBuilder"/> class.
     /// </summary>
     /// <param name="mapOperation">The target of the map operation.  May target a step or process</param>
-    internal ProcessMapBuilder(ProcessStepBuilder mapOperation)
-        : base($"Map{mapOperation.Name}")
+    /// <param name="processBuilder">The process builder that this map is part of</param>
+    internal ProcessMapBuilder(ProcessStepBuilder mapOperation, ProcessBuilder processBuilder)
+        : base($"Map{mapOperation.Name}", processBuilder)
     {
         this.MapOperation = mapOperation;
     }

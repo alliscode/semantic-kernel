@@ -32,7 +32,7 @@ public sealed record DaprProxyInfo : DaprStepInfo
 
         return new KernelProcessProxy(state, this.Edges)
         {
-            ProxyMetadata = this.ProxyMetadata,
+            //ProxyMetadata = this.ProxyMetadata,
         };
     }
 
@@ -52,7 +52,7 @@ public sealed record DaprProxyInfo : DaprStepInfo
             InnerStepDotnetType = proxyStepInfo.InnerStepDotnetType,
             State = proxyStepInfo.State,
             Edges = proxyStepInfo.Edges,
-            ProxyMetadata = kernelProxyInfo.ProxyMetadata,
+            ProxyMetadata = null //kernelProxyInfo.ProxyMetadata,
         };
     }
 }

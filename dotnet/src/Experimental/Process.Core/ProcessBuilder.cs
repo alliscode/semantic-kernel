@@ -28,6 +28,10 @@ public sealed class ProcessBuilder : ProcessStepBuilder
     /// </summary>
     internal bool HasParentProcess { get; set; }
 
+    internal ProcessProxyBuilder ExternalProxyStep { get; set; }
+
+    internal ProcessProxyBuilder LocalProxyStep { get; set; }
+
     /// <summary>
     /// Version of the process, used when saving the state of the process
     /// </summary>
@@ -158,7 +162,7 @@ public sealed class ProcessBuilder : ProcessStepBuilder
     /// <returns>An instance of <see cref="ProcessStepBuilder"/></returns>
     public ProcessStepBuilder AddStepFromType<TStep>(string? name = null, IReadOnlyList<string>? aliases = null) where TStep : KernelProcessStep
     {
-        ProcessStepBuilder<TStep> stepBuilder = new(name);
+        ProcessStepBuilder<TStep> stepBuilder = new(this, name);
 
         return this.AddStep(stepBuilder, aliases);
     }
@@ -174,7 +178,7 @@ public sealed class ProcessBuilder : ProcessStepBuilder
     /// <returns>An instance of <see cref="ProcessStepBuilder"/></returns>
     public ProcessStepBuilder AddStepFromType<TStep, TState>(TState initialState, string? name = null, IReadOnlyList<string>? aliases = null) where TStep : KernelProcessStep<TState> where TState : class, new()
     {
-        ProcessStepBuilder<TStep> stepBuilder = new(name, initialState: initialState);
+        ProcessStepBuilder<TStep> stepBuilder = new(this, name, initialState: initialState);
 
         return this.AddStep(stepBuilder, aliases);
     }
@@ -201,9 +205,9 @@ public sealed class ProcessBuilder : ProcessStepBuilder
     /// <returns>An instance of <see cref="ProcessMapBuilder"/></returns>
     public ProcessMapBuilder AddMapStepFromType<TStep>(string? name = null, IReadOnlyList<string>? aliases = null) where TStep : KernelProcessStep
     {
-        ProcessStepBuilder<TStep> stepBuilder = new(name);
+        ProcessStepBuilder<TStep> stepBuilder = new(this, name);
 
-        ProcessMapBuilder mapBuilder = new(stepBuilder);
+        ProcessMapBuilder mapBuilder = new(stepBuilder, this);
 
         return this.AddStep(mapBuilder, aliases);
     }
@@ -219,9 +223,9 @@ public sealed class ProcessBuilder : ProcessStepBuilder
     /// <returns>An instance of <see cref="ProcessMapBuilder"/></returns>
     public ProcessMapBuilder AddMapStepFromType<TStep, TState>(TState initialState, string? name = null, IReadOnlyList<string>? aliases = null) where TStep : KernelProcessStep<TState> where TState : class, new()
     {
-        ProcessStepBuilder<TStep> stepBuilder = new(name, initialState: initialState);
+        ProcessStepBuilder<TStep> stepBuilder = new(this, name, initialState: initialState);
 
-        ProcessMapBuilder mapBuilder = new(stepBuilder);
+        ProcessMapBuilder mapBuilder = new(stepBuilder, this);
 
         return this.AddStep(mapBuilder, aliases);
     }
@@ -238,7 +242,7 @@ public sealed class ProcessBuilder : ProcessStepBuilder
     {
         process.HasParentProcess = true;
 
-        ProcessMapBuilder mapBuilder = new(process);
+        ProcessMapBuilder mapBuilder = new(process, this);
 
         return this.AddStep(mapBuilder, aliases);
     }
@@ -250,11 +254,12 @@ public sealed class ProcessBuilder : ProcessStepBuilder
     /// </summary>
     /// <param name="externalTopics">topic names to be used externally</param>
     /// <param name="name">name of the proxy step</param>
+    /// <param name="channelKey">The key associated with the  <see cref="IExternalKernelProcessMessageChannel"/> that should be used. This is required when more than one implementation of  <see cref="IExternalKernelProcessMessageChannel"/> is provided.</param>
     /// <param name="aliases">Aliases that have been used by previous versions of the step, used for supporting backward compatibility when reading old version Process States</param>
     /// <returns>An instance of <see cref="ProcessProxyBuilder"/></returns>
-    public ProcessProxyBuilder AddProxyStep(IReadOnlyList<string> externalTopics, string? name = null, IReadOnlyList<string>? aliases = null)
+    public ProcessProxyBuilder AddProxyStep(IReadOnlyList<string> externalTopics, string? name = null, string? channelKey = null, IReadOnlyList<string>? aliases = null)
     {
-        ProcessProxyBuilder proxyBuilder = new(externalTopics, name ?? nameof(KernelProxyStep));
+        ProcessProxyBuilder proxyBuilder = new(this, name ?? nameof(KernelProxyStep));
 
         return this.AddStep(proxyBuilder, aliases);
     }
@@ -328,8 +333,13 @@ public sealed class ProcessBuilder : ProcessStepBuilder
     /// </summary>
     /// <param name="name">The name of the process. This is required.</param>
     public ProcessBuilder(string name)
-        : base(name)
+        : base(name, null)
     {
+        this.ExternalProxyStep = new(this, "ExternalProxyStep");
+        this.LocalProxyStep = new(this, "LocalProxyStep");
+
+        this.AddStep(this.ExternalProxyStep, []);
+        this.AddStep(this.LocalProxyStep, []);
     }
 
     #endregion

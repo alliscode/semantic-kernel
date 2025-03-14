@@ -18,6 +18,13 @@ public sealed record class KernelProcessProxyStateMetadata : KernelProcessStepSt
     public List<string> PublishTopics { get; set; } = [];
 
     /// <summary>
+    /// The key associated with the associated <see cref="IExternalKernelProcessMessageChannel"/> that should be used. This is required when more than one implementation of  <see cref="IExternalKernelProcessMessageChannel"/> is provided.
+    /// </summary>
+    [DataMember]
+    [JsonPropertyName("channelKey")]
+    public string? ChannelKey { get; set; }
+
+    /// <summary>
     /// Map that stores which process events trigger external topic to be published and internal metadata information
     /// </summary>
     [DataMember]

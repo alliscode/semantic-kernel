@@ -13,7 +13,7 @@ public sealed record KernelProcessProxy : KernelProcessStepInfo
     /// <summary>
     /// Proxy metadata used for linking specific SK events to external events and viceversa
     /// </summary>
-    public KernelProcessProxyStateMetadata? ProxyMetadata { get; init; }
+    //public KernelProcessProxyStateMetadata? ProxyMetadata { get; init; }
 
     /// <summary>
     /// Creates a new instance of the <see cref="KernelProcess"/> class.
