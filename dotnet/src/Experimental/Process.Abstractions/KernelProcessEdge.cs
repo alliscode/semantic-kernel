@@ -1,5 +1,6 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
+using System.Collections.Generic;
 using System.Runtime.Serialization;
 
 namespace Microsoft.SemanticKernel;
@@ -24,14 +25,21 @@ public sealed class KernelProcessEdge
     public KernelProcessFunctionTarget OutputTarget { get; init; }
 
     /// <summary>
+    /// The collection of extra data associated with the edge.
+    /// </summary>
+    [DataMember]
+    public IDictionary<string, object?>? Extras { get; init; }
+
+    /// <summary>
     /// Creates a new instance of the <see cref="KernelProcessEdge"/> class.
     /// </summary>
-    public KernelProcessEdge(string sourceStepId, KernelProcessFunctionTarget outputTarget)
+    public KernelProcessEdge(string sourceStepId, KernelProcessFunctionTarget outputTarget, IDictionary<string, object?>? extras = null)
     {
         Verify.NotNullOrWhiteSpace(sourceStepId);
         Verify.NotNull(outputTarget);
 
         this.SourceStepId = sourceStepId;
         this.OutputTarget = outputTarget;
+        this.Extras = extras;
     }
 }

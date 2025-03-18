@@ -1,6 +1,7 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
 using Microsoft.SemanticKernel;
+using Microsoft.SemanticKernel.Process;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -22,6 +23,9 @@ builder.Services.AddActors(static options =>
 });
 
 builder.Services.AddControllers();
+
+builder.Services.AddSignalR();
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
@@ -37,4 +41,5 @@ else
 
 app.MapControllers();
 app.MapActorsHandlers();
+app.MapHub<LocalEventHandler>("/events");
 app.Run();

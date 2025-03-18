@@ -1,6 +1,7 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
 using System;
+using System.Collections.Generic;
 using Microsoft.SemanticKernel.Process.Internal;
 
 namespace Microsoft.SemanticKernel;
@@ -21,6 +22,11 @@ public sealed class ProcessStepEdgeBuilder
     /// The source step of the edge.
     /// </summary>
     internal ProcessStepBuilder Source { get; }
+
+    /// <summary>
+    /// The extras dictionary for the edge.
+    /// </summary>
+    internal Dictionary<string, object?>? Extras { get; private set; }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ProcessStepEdgeBuilder"/> class.
@@ -79,8 +85,17 @@ public sealed class ProcessStepEdgeBuilder
     {
         // 1. Link sk event and topic
         //proxyStep.LinkTopicToStepEdgeInfo(topicName, this.Source, this.EventData);
-
         var processBuilder = this.Source.ProcessBuilder;
+
+        this.Extras ??= [];
+        this.Extras.Add("ChannelKey", channelKey);
+        this.Extras.Add("TopicName", topicName);
+
+        if (processBuilder is null)
+        {
+            throw new InvalidOperationException("The root process could not be found.");
+        }
+
         var targetBuilder = processBuilder.ExternalProxyStep.GetExternalFunctionTargetBuilder();
         return this.SendEventTo(targetBuilder);
     }

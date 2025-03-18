@@ -19,8 +19,6 @@ namespace Microsoft.SemanticKernel;
 
 internal class StepActor : Actor, IStep, IKernelProcessMessageChannel
 {
-    private readonly Lazy<ValueTask> _activateTask;
-
     private DaprStepInfo? _stepInfo;
     private ILogger? _logger;
     private Type? _innerStepType;
@@ -37,6 +35,7 @@ internal class StepActor : Actor, IStep, IKernelProcessMessageChannel
     internal readonly Dictionary<string, KernelFunction> _functions = [];
     internal Dictionary<string, Dictionary<string, object?>?>? _inputs = [];
     internal Dictionary<string, Dictionary<string, object?>?>? _initialInputs = [];
+    internal readonly Lazy<ValueTask> _activateTask;
 
     internal string? ParentProcessId;
     internal ActorId? EventProxyStepId;
@@ -431,6 +430,7 @@ internal class StepActor : Actor, IStep, IKernelProcessMessageChannel
             }
         }
 
+        // Emit the event to the event proxy step if one exists. This is used when running as an operation within a MapStep<this>.
         if (this.EventProxyStepId != null)
         {
             IEventBuffer proxyBuffer = this.ProxyFactory.CreateActorProxy<IEventBuffer>(this.EventProxyStepId, nameof(EventBufferActor));

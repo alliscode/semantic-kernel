@@ -30,10 +30,7 @@ public sealed record DaprProxyInfo : DaprStepInfo
             throw new KernelException($"Unable to read state from proxy with name '{this.State.Name}', Id '{this.State.Id}' and type {this.State.GetType()}.");
         }
 
-        return new KernelProcessProxy(state, this.Edges)
-        {
-            //ProxyMetadata = this.ProxyMetadata,
-        };
+        return new KernelProcessProxy(state, this.Edges);
     }
 
     /// <summary>
@@ -52,7 +49,7 @@ public sealed record DaprProxyInfo : DaprStepInfo
             InnerStepDotnetType = proxyStepInfo.InnerStepDotnetType,
             State = proxyStepInfo.State,
             Edges = proxyStepInfo.Edges,
-            ProxyMetadata = null //kernelProxyInfo.ProxyMetadata,
+            ProxyMetadata = null //kernelProxyInfo.ProxyMetadata, TODO: Remove ProxyMetadata from DaprProxyInfo
         };
     }
 }

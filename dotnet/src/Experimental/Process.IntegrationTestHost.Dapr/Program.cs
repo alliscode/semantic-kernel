@@ -28,6 +28,8 @@ builder.Services.AddActors(static options =>
     options.Actors.RegisterActor<HealthActor>();
 });
 
+builder.Services.AddExternalChannels();
+
 builder.Services.AddControllers().AddJsonOptions(options =>
 {
     options.JsonSerializerOptions.TypeInfoResolver = new ProcessStateTypeResolver<KickoffStep>();

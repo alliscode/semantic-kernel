@@ -36,4 +36,9 @@ public record ProcessMessage(
     /// The data associated with the target event. This may be null if the message is not targeting a sub-process.
     /// </summary>
     public object? TargetEventData { get; init; }
+
+    /// <summary>
+    /// A dictionary of extra information.
+    /// </summary>
+    public IDictionary<string, object?>? Extras { get; init; }
 }

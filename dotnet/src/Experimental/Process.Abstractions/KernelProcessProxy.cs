@@ -1,7 +1,6 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 using System.Collections.Generic;
 using Microsoft.SemanticKernel.Process;
-using Microsoft.SemanticKernel.Process.Models;
 
 namespace Microsoft.SemanticKernel;
 
@@ -10,11 +9,6 @@ namespace Microsoft.SemanticKernel;
 /// </summary>
 public sealed record KernelProcessProxy : KernelProcessStepInfo
 {
-    /// <summary>
-    /// Proxy metadata used for linking specific SK events to external events and viceversa
-    /// </summary>
-    //public KernelProcessProxyStateMetadata? ProxyMetadata { get; init; }
-
     /// <summary>
     /// Creates a new instance of the <see cref="KernelProcess"/> class.
     /// </summary>
