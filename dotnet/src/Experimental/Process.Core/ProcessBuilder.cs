@@ -162,7 +162,7 @@ public sealed class ProcessBuilder : ProcessStepBuilder
     /// <returns>An instance of <see cref="ProcessStepBuilder"/></returns>
     public ProcessStepBuilder AddStepFromType<TStep>(string? name = null, IReadOnlyList<string>? aliases = null) where TStep : KernelProcessStep
     {
-        ProcessStepBuilder<TStep> stepBuilder = new(this, name);
+        ProcessStepBuilder<TStep> stepBuilder = new(name, this);
 
         return this.AddStep(stepBuilder, aliases);
     }
@@ -178,7 +178,7 @@ public sealed class ProcessBuilder : ProcessStepBuilder
     /// <returns>An instance of <see cref="ProcessStepBuilder"/></returns>
     public ProcessStepBuilder AddStepFromType<TStep, TState>(TState initialState, string? name = null, IReadOnlyList<string>? aliases = null) where TStep : KernelProcessStep<TState> where TState : class, new()
     {
-        ProcessStepBuilder<TStep> stepBuilder = new(this, name, initialState: initialState);
+        ProcessStepBuilder<TStep> stepBuilder = new(name, processBuilder: this, initialState: initialState);
 
         return this.AddStep(stepBuilder, aliases);
     }
@@ -205,7 +205,7 @@ public sealed class ProcessBuilder : ProcessStepBuilder
     /// <returns>An instance of <see cref="ProcessMapBuilder"/></returns>
     public ProcessMapBuilder AddMapStepFromType<TStep>(string? name = null, IReadOnlyList<string>? aliases = null) where TStep : KernelProcessStep
     {
-        ProcessStepBuilder<TStep> stepBuilder = new(this, name);
+        ProcessStepBuilder<TStep> stepBuilder = new(name, processBuilder: this);
 
         ProcessMapBuilder mapBuilder = new(stepBuilder, this);
 
@@ -223,7 +223,7 @@ public sealed class ProcessBuilder : ProcessStepBuilder
     /// <returns>An instance of <see cref="ProcessMapBuilder"/></returns>
     public ProcessMapBuilder AddMapStepFromType<TStep, TState>(TState initialState, string? name = null, IReadOnlyList<string>? aliases = null) where TStep : KernelProcessStep<TState> where TState : class, new()
     {
-        ProcessStepBuilder<TStep> stepBuilder = new(this, name, initialState: initialState);
+        ProcessStepBuilder<TStep> stepBuilder = new(name, processBuilder: this, initialState: initialState);
 
         ProcessMapBuilder mapBuilder = new(stepBuilder, this);
 
@@ -259,7 +259,7 @@ public sealed class ProcessBuilder : ProcessStepBuilder
     /// <returns>An instance of <see cref="ProcessProxyBuilder"/></returns>
     public ProcessProxyBuilder AddProxyStep(IReadOnlyList<string> externalTopics, string? name = null, string? channelKey = null, IReadOnlyList<string>? aliases = null)
     {
-        ProcessProxyBuilder proxyBuilder = new(this, name ?? nameof(KernelProxyStep));
+        ProcessProxyBuilder proxyBuilder = new(name ?? nameof(KernelProxyStep), this);
 
         return this.AddStep(proxyBuilder, aliases);
     }
@@ -335,8 +335,8 @@ public sealed class ProcessBuilder : ProcessStepBuilder
     public ProcessBuilder(string name)
         : base(name, null)
     {
-        this.ExternalProxyStep = new(this, "ExternalProxyStep");
-        this.LocalProxyStep = new(this, "LocalProxyStep");
+        this.ExternalProxyStep = new("ExternalProxyStep", this);
+        this.LocalProxyStep = new("LocalProxyStep", this);
 
         this.AddStep(this.ExternalProxyStep, []);
         this.AddStep(this.LocalProxyStep, []);

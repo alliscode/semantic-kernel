@@ -220,7 +220,7 @@ public abstract class ProcessStepBuilder
     /// </summary>
     /// <param name="name">The name of the step.</param>
     /// <param name="processBuilder">The process builder that this step belongs to.</param>
-    protected ProcessStepBuilder(string name, ProcessBuilder? processBuilder)
+    protected ProcessStepBuilder(string name, ProcessBuilder? processBuilder = null)
     {
         this.Name ??= name;
         Verify.NotNullOrWhiteSpace(name);
@@ -246,10 +246,10 @@ public class ProcessStepBuilder<TStep> : ProcessStepBuilder where TStep : Kernel
     /// <summary>
     /// Creates a new instance of the <see cref="ProcessStepBuilder"/> class. If a name is not provided, the name will be derived from the type of the step.
     /// </summary>
-    /// <param name="processBuilder">The process builder that this step belongs to.</param>
     /// <param name="name">Optional: The name of the step.</param>
     /// <param name="initialState">Initial state of the step to be used on the step building stage</param>
-    internal ProcessStepBuilder(ProcessBuilder processBuilder, string? name = null, object? initialState = default)
+    /// <param name="processBuilder">The process builder that this step belongs to.</param>
+    internal ProcessStepBuilder(string? name = null, object? initialState = default, ProcessBuilder? processBuilder = null)
         : base(name ?? typeof(TStep).Name, processBuilder)
     {
         this.FunctionsDict = this.GetFunctionMetadataMap();

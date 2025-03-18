@@ -18,7 +18,7 @@ public sealed class ProcessMapBuilder : ProcessStepBuilder
     /// </summary>
     /// <param name="mapOperation">The target of the map operation.  May target a step or process</param>
     /// <param name="processBuilder">The process builder that this map is part of</param>
-    internal ProcessMapBuilder(ProcessStepBuilder mapOperation, ProcessBuilder processBuilder)
+    internal ProcessMapBuilder(ProcessStepBuilder mapOperation, ProcessBuilder? processBuilder = null)
         : base($"Map{mapOperation.Name}", processBuilder)
     {
         this.MapOperation = mapOperation;

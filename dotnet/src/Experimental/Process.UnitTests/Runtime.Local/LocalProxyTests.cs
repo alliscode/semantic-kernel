@@ -33,7 +33,7 @@ public class LocalProxyTests
         var proxyStep = process.AddProxyStep([this._topic1, this._topic2]);
 
         process.OnInputEvent(this._startProcessEvent).SendEventTo(new(counterStep));
-        counterStep.OnFunctionResult().EmitExternalEvent(proxyStep, this._topic1);
+        counterStep.OnFunctionResult().EmitExternalEvent(this._topic1);
 
         KernelProcess processInstance = process.Build();
         CounterService counterService = new();
@@ -84,7 +84,7 @@ public class LocalProxyTests
         process.OnInputEvent(this._startProcessEvent).SendEventTo(new(counterStep));
 
         // Act & Assert
-        Assert.Throws<InvalidOperationException>(() => counterStep.OnFunctionResult().EmitExternalEvent(proxyStep, this._topic2));
+        Assert.Throws<InvalidOperationException>(() => counterStep.OnFunctionResult().EmitExternalEvent(this._topic2));
     }
 
     /// <summary>
@@ -244,7 +244,7 @@ public class LocalProxyTests
 
         counterStep
             .OnFunctionResult()
-            .EmitExternalEvent(proxyStep, this._topic1)
+            .EmitExternalEvent(this._topic1)
             .SendEventTo(new(evenNumberStep));
 
         // request another number if number is odd
@@ -254,7 +254,7 @@ public class LocalProxyTests
 
         evenNumberStep
             .OnEvent(CommonSteps.EvenNumberDetectorStep.OutputEvents.EvenNumber)
-            .EmitExternalEvent(proxyStep, this._topic2);
+            .EmitExternalEvent(this._topic2);
 
         return process;
     }

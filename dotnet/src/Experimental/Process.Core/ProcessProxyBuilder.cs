@@ -11,8 +11,8 @@ namespace Microsoft.SemanticKernel;
 /// </summary>
 public sealed class ProcessProxyBuilder : ProcessStepBuilder<KernelProxyStep>
 {
-    internal ProcessProxyBuilder(ProcessBuilder processBuilder, string name)
-        : base(processBuilder, name)
+    internal ProcessProxyBuilder(string name, ProcessBuilder? processBuilder = null)
+        : base(name, processBuilder)
     {
     }
 
