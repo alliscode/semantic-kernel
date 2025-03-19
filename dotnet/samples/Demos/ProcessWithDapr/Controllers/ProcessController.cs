@@ -3,6 +3,7 @@
 using System.Runtime.Serialization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.SemanticKernel;
+using Microsoft.SemanticKernel.Process;
 
 namespace ProcessWithDapr.Controllers;
 
@@ -13,14 +14,16 @@ namespace ProcessWithDapr.Controllers;
 public class ProcessController : ControllerBase
 {
     private readonly Kernel _kernel;
+    private readonly DaprProcessFactory _processFactory;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ProcessController"/> class.
     /// </summary>
     /// <param name="kernel">An instance of <see cref="Kernel"/></param>
-    public ProcessController(Kernel kernel)
+    public ProcessController(Kernel kernel, DaprProcessFactory daprProcessFactory)
     {
         this._kernel = kernel;
+        this._processFactory = daprProcessFactory;
     }
 
     /// <summary>
@@ -32,7 +35,12 @@ public class ProcessController : ControllerBase
     public async Task<IActionResult> PostAsync(string processId)
     {
         var process = this.GetProcess();
-        var processContext = await process.StartAsync(new KernelProcessEvent() { Id = CommonEvents.StartProcess }, processId: processId);
+        //var processContext = await process.StartAsync(new KernelProcessEvent() { Id = CommonEvents.StartProcess }, processId: processId);
+        var processContext = await this._processFactory.StartAsync(process, new KernelProcessEvent() { Id = CommonEvents.StartProcess }, processId: processId, (eventData) =>
+        {
+            int x = 3;
+            return Task.CompletedTask;
+        });
         var finalState = await processContext.GetStateAsync();
 
         return this.Ok(processId);
@@ -83,6 +91,7 @@ public class ProcessController : ControllerBase
         // When the CStep has finished by requesting an exit, stop the process.
         myCStep
             .OnEvent(CommonEvents.ExitRequested)
+            .EmitLocalEvent()
             .StopProcess();
 
         var process = processBuilder.Build();

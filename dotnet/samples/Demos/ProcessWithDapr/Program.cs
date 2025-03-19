@@ -22,6 +22,8 @@ builder.Services.AddActors(static options =>
     options.AddProcessActors();
 });
 
+builder.Services.AddExternalChannels();
+
 builder.Services.AddControllers();
 
 builder.Services.AddSignalR();

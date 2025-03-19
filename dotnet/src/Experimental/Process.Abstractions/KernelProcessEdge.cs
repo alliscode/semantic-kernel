@@ -28,12 +28,12 @@ public sealed class KernelProcessEdge
     /// The collection of extra data associated with the edge.
     /// </summary>
     [DataMember]
-    public IDictionary<string, object?>? Extras { get; init; }
+    public IDictionary<string, string?>? Extras { get; init; }
 
     /// <summary>
     /// Creates a new instance of the <see cref="KernelProcessEdge"/> class.
     /// </summary>
-    public KernelProcessEdge(string sourceStepId, KernelProcessFunctionTarget outputTarget, IDictionary<string, object?>? extras = null)
+    public KernelProcessEdge(string sourceStepId, KernelProcessFunctionTarget outputTarget, IDictionary<string, string?>? extras = null)
     {
         Verify.NotNullOrWhiteSpace(sourceStepId);
         Verify.NotNull(outputTarget);

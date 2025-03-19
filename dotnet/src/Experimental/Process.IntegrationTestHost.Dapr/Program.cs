@@ -1,6 +1,7 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
 using Microsoft.SemanticKernel;
+using Microsoft.SemanticKernel.Process;
 using SemanticKernel.Process.IntegrationTests;
 using SemanticKernel.Process.TestsShared.CloudEvents;
 
@@ -35,8 +36,11 @@ builder.Services.AddControllers().AddJsonOptions(options =>
     options.JsonSerializerOptions.TypeInfoResolver = new ProcessStateTypeResolver<KickoffStep>();
 });
 
+builder.Services.AddSignalR();
+
 var app = builder.Build();
 
+app.MapHub<LocalEventHandler>("/events");
 app.MapControllers();
 app.MapActorsHandlers();
 app.Run();

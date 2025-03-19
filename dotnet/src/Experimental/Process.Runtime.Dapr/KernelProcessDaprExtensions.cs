@@ -43,8 +43,10 @@ public static class KernelProcessDaprExtensions
 
         // For completeness, let's also allow IReadOnlyDictionary to be resolved.
         sc.AddTransient(
-            typeof(IReadOnlyDictionary<,>), typeof(KeyedExternalChannels));
+            typeof(IReadOnlyDictionary<string,IExternalKernelProcessMessageChannel>), typeof(KeyedServiceDictionary));
 
-        sc.AddSingleton<IExternalKernelProcessMessageChannel, LocalEventProxyChannel>();
+        sc.AddKeyedSingleton<IExternalKernelProcessMessageChannel, LocalEventProxyChannel>("LocalProxy");
+        sc.AddSingleton<DaprProcessFactory>();
+        sc.AddSingleton<ProcessLocalContext>();
     }
 }

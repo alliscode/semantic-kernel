@@ -26,7 +26,7 @@ public sealed class ProcessStepEdgeBuilder
     /// <summary>
     /// The extras dictionary for the edge.
     /// </summary>
-    internal Dictionary<string, object?>? Extras { get; private set; }
+    internal Dictionary<string, string?>? Extras { get; private set; }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ProcessStepEdgeBuilder"/> class.
@@ -51,7 +51,7 @@ public sealed class ProcessStepEdgeBuilder
         Verify.NotNull(this.Source?.Id);
         Verify.NotNull(this.Target);
 
-        return new KernelProcessEdge(this.Source.Id, this.Target.Build());
+        return new KernelProcessEdge(this.Source.Id, this.Target.Build(), extras: this.Extras);
     }
 
     /// <summary>
@@ -83,8 +83,6 @@ public sealed class ProcessStepEdgeBuilder
     /// <returns></returns>
     public ProcessStepEdgeBuilder EmitExternalEvent(string topicName, string? channelKey = null)
     {
-        // 1. Link sk event and topic
-        //proxyStep.LinkTopicToStepEdgeInfo(topicName, this.Source, this.EventData);
         var processBuilder = this.Source.ProcessBuilder;
 
         this.Extras ??= [];
@@ -100,11 +98,22 @@ public sealed class ProcessStepEdgeBuilder
         return this.SendEventTo(targetBuilder);
     }
 
-    //public ProcessStepEdgeBuilder InterceptEvent(Action<KernelProcessEvent> eventHandler)
-    //{
-    //    // Generate a KernelFunction that call the event handler
-    //    // Add the kernel function to a LocalExecutor
-    //}
+    public ProcessStepEdgeBuilder EmitLocalEvent()
+    {
+        var processBuilder = this.Source.ProcessBuilder;
+
+        this.Extras ??= [];
+        this.Extras.Add("ChannelKey", "LocalProxy");
+        this.Extras.Add("TopicName", "LocalProxy");
+
+        if (processBuilder is null)
+        {
+            throw new InvalidOperationException("The root process could not be found.");
+        }
+
+        var targetBuilder = processBuilder.LocalProxyStep.GetExternalFunctionTargetBuilder();
+        return this.SendEventTo(targetBuilder);
+    }
 
     /// <summary>
     /// Signals that the process should be stopped.

@@ -40,5 +40,5 @@ public record ProcessMessage(
     /// <summary>
     /// A dictionary of extra information.
     /// </summary>
-    public IDictionary<string, object?>? Extras { get; init; }
+    public IDictionary<string, string?>? Extras { get; init; }
 }

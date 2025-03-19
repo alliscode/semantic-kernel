@@ -29,6 +29,8 @@ internal sealed class ProxyActor : StepActor, IProxy
     {
         this._logger = this._kernel.LoggerFactory?.CreateLogger(typeof(KernelProxyStep)) ?? new NullLogger<ProxyActor>();
         this._externalMessageChannels = externalMessageChannels;
+
+        this.Logger.LogInformation($"Found {externalMessageChannels.Count} ExternalChannels with keys {string.Join(",", externalMessageChannels.Keys)}");
     }
 
     internal override async Task HandleMessageAsync(ProcessMessage message)
@@ -48,7 +50,7 @@ internal sealed class ProxyActor : StepActor, IProxy
             throw new KernelException("The proxy step can only handle 1 parameter object").Log(this._logger);
         }
 
-        if (message.Extras is null || !message.Extras.TryGetValue("", out object? topicIdObj) || topicIdObj is not string topicId)
+        if (message.Extras is null || !message.Extras.TryGetValue("TopicName", out string? topicId) || string.IsNullOrWhiteSpace(topicId))
         {
             throw new KernelException("The proxy step requires a topic id be provided").Log(this._logger);
         }
@@ -60,7 +62,7 @@ internal sealed class ProxyActor : StepActor, IProxy
 
         // Get the optional ChannelId from the message
         string? channelId = null;
-        if (message.Extras.TryGetValue("ChannelId", out object? channelIdObj) && channelIdObj is string channelIdStr)
+        if (message.Extras.TryGetValue("ChannelId", out string channelIdStr) && !string.IsNullOrWhiteSpace(channelId))
         {
             channelId = channelIdStr;
         }
@@ -98,5 +100,16 @@ internal sealed class ProxyActor : StepActor, IProxy
         this._daprProxyInfo = proxyInfo;
 
         await base.InitializeStepAsync(proxyInfo, parentProcessId).ConfigureAwait(false);
+    }
+
+    protected async override ValueTask ActivateStepAsync()
+    {
+        await base.ActivateStepAsync().ConfigureAwait(false);
+
+        foreach (var kvp in this._externalMessageChannels)
+        {
+            await kvp.Value.Initialize().ConfigureAwait(false);
+        }
+
     }
 }

@@ -22,7 +22,7 @@ internal class LocalEventProxyChannel : IExternalKernelProcessMessageChannel
     public async ValueTask Initialize()
     {
         this._hubConnection = new HubConnectionBuilder()
-            .WithUrl(new Uri("/chathub"))
+            .WithUrl(new Uri("http://localhost:5200/events"))
             .Build();
 
         await this._hubConnection.StartAsync().ConfigureAwait(false);
