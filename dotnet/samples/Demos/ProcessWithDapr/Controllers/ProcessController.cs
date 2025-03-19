@@ -175,7 +175,7 @@ public class ProcessController : ControllerBase
             {
                 // Exit the processes
                 Console.WriteLine("##### CStep run cycle 3 - exiting.");
-                await context.EmitEventAsync(new() { Id = CommonEvents.ExitRequested });
+                await context.EmitEventAsync(new() { Id = CommonEvents.ExitRequested, Data = this._state.CurrentCycle });
                 return;
             }
 
