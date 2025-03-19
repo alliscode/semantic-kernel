@@ -1,7 +1,12 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
+using System.Diagnostics;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Process;
+
+#if DEBUG
+Debugger.Launch();
+#endif
 
 var builder = WebApplication.CreateBuilder(args);
 
