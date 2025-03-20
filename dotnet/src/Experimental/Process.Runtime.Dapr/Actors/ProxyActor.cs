@@ -24,18 +24,22 @@ internal sealed class ProxyActor : StepActor, IProxy
     /// </summary>
     /// <param name="host">The Dapr host actor</param>
     /// <param name="kernel">An instance of <see cref="Kernel"/></param>
+    /// <param name="externalMessageChannels">The external message channels</param>
     public ProxyActor(ActorHost host, Kernel kernel, IReadOnlyDictionary<string, IExternalKernelProcessMessageChannel> externalMessageChannels)
         : base(host, kernel)
     {
         this._logger = this._kernel.LoggerFactory?.CreateLogger(typeof(KernelProxyStep)) ?? new NullLogger<ProxyActor>();
         this._externalMessageChannels = externalMessageChannels;
-
-        this.Logger.LogInformation($"Found {externalMessageChannels.Count} ExternalChannels with keys {string.Join(",", externalMessageChannels.Keys)}");
     }
 
     internal override async Task HandleMessageAsync(ProcessMessage message)
     {
         Verify.NotNull(message, nameof(message));
+
+        if (this._externalMessageChannels.Count == 0)
+        {
+            throw new KernelException("The proxy step requires a channel id be provided").Log(this._logger);
+        }
 
         // Lazy one-time initialization of the step before processing a message
         await this._activateTask.Value.ConfigureAwait(false);
@@ -50,27 +54,15 @@ internal sealed class ProxyActor : StepActor, IProxy
             throw new KernelException("The proxy step can only handle 1 parameter object").Log(this._logger);
         }
 
-        if (message.Extras is null || !message.Extras.TryGetValue("TopicName", out string? topicId) || string.IsNullOrWhiteSpace(topicId))
+        if (string.IsNullOrWhiteSpace(message.ProxyInfo?.TopicId))
         {
             throw new KernelException("The proxy step requires a topic id be provided").Log(this._logger);
-        }
-
-        if (this._externalMessageChannels.Count == 0)
-        {
-            throw new KernelException("The proxy step requires a channel id be provided").Log(this._logger);
-        }
-
-        // Get the optional ChannelId from the message
-        string? channelId = null;
-        if (message.Extras.TryGetValue("ChannelId", out string channelIdStr) && !string.IsNullOrWhiteSpace(channelId))
-        {
-            channelId = channelIdStr;
         }
 
         IExternalKernelProcessMessageChannel? channel = null;
 
         // If there is no channelId provided, there can only be one channel
-        if (string.IsNullOrEmpty(channelId))
+        if (string.IsNullOrEmpty(message.ProxyInfo.ChannelKey))
         {
             if (this._externalMessageChannels.Count > 1)
             {
@@ -81,7 +73,7 @@ internal sealed class ProxyActor : StepActor, IProxy
         }
         else
         {
-            channel = this._externalMessageChannels[channelId];
+            channel = this._externalMessageChannels[message.ProxyInfo.ChannelKey];
         }
 
         if (channel is null)
@@ -91,7 +83,7 @@ internal sealed class ProxyActor : StepActor, IProxy
 
         // Add the message values to the inputs for the function
         var kvp = message.Values.Single();
-        var proxyMessage = KernelProcessProxyMessageFactory.CreateProxyMessage(this.ParentProcessId!, message.SourceEventId, topicId, kvp.Value);
+        var proxyMessage = KernelProcessProxyMessageFactory.CreateProxyMessage(this.ParentProcessId!, message.SourceEventId, message.ProxyInfo.TopicId, kvp.Value);
         await channel.EmitExternalEventAsync(proxyMessage.ExternalTopicName, proxyMessage).ConfigureAwait(false);
     }
 

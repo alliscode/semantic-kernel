@@ -1,7 +1,6 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
 using System;
-using System.Collections.Generic;
 using Microsoft.SemanticKernel.Process.Internal;
 
 namespace Microsoft.SemanticKernel;
@@ -26,7 +25,7 @@ public sealed class ProcessStepEdgeBuilder
     /// <summary>
     /// The extras dictionary for the edge.
     /// </summary>
-    internal Dictionary<string, string?>? Extras { get; private set; }
+    internal KernelProcessEdgeProxyInfo? ProxyInfo { get; set; }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ProcessStepEdgeBuilder"/> class.
@@ -51,7 +50,7 @@ public sealed class ProcessStepEdgeBuilder
         Verify.NotNull(this.Source?.Id);
         Verify.NotNull(this.Target);
 
-        return new KernelProcessEdge(this.Source.Id, this.Target.Build(), extras: this.Extras);
+        return new KernelProcessEdge(this.Source.Id, this.Target.Build(), proxyInfo: this.ProxyInfo);
     }
 
     /// <summary>
@@ -78,16 +77,14 @@ public sealed class ProcessStepEdgeBuilder
     }
 
     /// <summary>
-    /// Emit the SK step event as an external event with specific topic name
+    /// Emit the event to an external event channel using the specified topic name.
     /// </summary>
-    /// <returns></returns>
+    /// <returns>An instance of <see cref="ProcessStepEdgeBuilder"/></returns>
     public ProcessStepEdgeBuilder EmitExternalEvent(string topicName, string? channelKey = null)
     {
         var processBuilder = this.Source.ProcessBuilder;
 
-        this.Extras ??= [];
-        this.Extras.Add("ChannelKey", channelKey);
-        this.Extras.Add("TopicName", topicName);
+        this.ProxyInfo ??= new(TopicId: topicName, ChannelKey: channelKey);
 
         if (processBuilder is null)
         {
@@ -98,13 +95,16 @@ public sealed class ProcessStepEdgeBuilder
         return this.SendEventTo(targetBuilder);
     }
 
+    /// <summary>
+    /// Emit the SK step event as an external event with specific topic name
+    /// </summary>
+    /// <returns>An instance of <see cref="ProcessStepEdgeBuilder"/></returns>
+    /// <exception cref="InvalidOperationException"></exception>
     public ProcessStepEdgeBuilder EmitLocalEvent()
     {
         var processBuilder = this.Source.ProcessBuilder;
 
-        this.Extras ??= [];
-        this.Extras.Add("ChannelKey", "LocalProxy");
-        this.Extras.Add("TopicName", "LocalProxy");
+        this.ProxyInfo ??= new(TopicId: "LocalProxy", ChannelKey: "LocalProxy");
 
         if (processBuilder is null)
         {

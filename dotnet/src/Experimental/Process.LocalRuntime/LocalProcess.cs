@@ -218,12 +218,12 @@ internal sealed class LocalProcess : LocalStep, System.IAsyncDisposable
             }
             else if (step is KernelProcessProxy proxyStep)
             {
+                Dictionary<string, IExternalKernelProcessMessageChannel> externalMessageChannels = new() { { "default", this.ExternalMessageChannel } };
                 localStep =
-                    new LocalProxy(proxyStep, this._kernel)
+                    new LocalProxy(proxyStep, this._kernel, externalMessageChannels)
                     {
                         ParentProcessId = this.RootProcessId,
                         EventProxy = this.EventProxy,
-                        ExternalMessageChannel = this.ExternalMessageChannel,
                     };
             }
             else

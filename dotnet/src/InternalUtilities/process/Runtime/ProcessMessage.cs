@@ -38,7 +38,7 @@ public record ProcessMessage(
     public object? TargetEventData { get; init; }
 
     /// <summary>
-    /// A dictionary of extra information.
+    /// Optional information about the proxy step targeted by this edge.
     /// </summary>
-    public IDictionary<string, string?>? Extras { get; init; }
+    public ProcessEdgeProxyInfo? ProxyInfo { get; init; }
 }

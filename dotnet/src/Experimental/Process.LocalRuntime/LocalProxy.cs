@@ -14,6 +14,7 @@ namespace Microsoft.SemanticKernel;
 internal sealed class LocalProxy : LocalStep
 {
     private readonly KernelProcessProxy _proxy;
+    private readonly IReadOnlyDictionary<string, IExternalKernelProcessMessageChannel> _externalMessageChannels;
     private readonly ILogger _logger;
 
     private bool _isInitialized = false;
@@ -23,43 +24,68 @@ internal sealed class LocalProxy : LocalStep
     /// </summary>
     /// <param name="proxy">an instance of <see cref="KernelProcessProxy"/></param>
     /// <param name="kernel">An instance of <see cref="Kernel"/></param>
-    internal LocalProxy(KernelProcessProxy proxy, Kernel kernel)
+    internal LocalProxy(KernelProcessProxy proxy, Kernel kernel, IReadOnlyDictionary<string, IExternalKernelProcessMessageChannel> externalMessageChannels)
         : base(proxy, kernel)
     {
         this._proxy = proxy;
         this._logger = this._kernel.LoggerFactory?.CreateLogger(this._proxy.State.Name) ?? new NullLogger<LocalStep>();
+        this._externalMessageChannels = externalMessageChannels;
     }
 
-    //internal override void AssignStepFunctionParameterValues(ProcessMessage message)
-    //{
-    //    if (this._functions is null || this._inputs is null || this._initialInputs is null)
-    //    {
-    //        throw new KernelException("The step has not been initialized.").Log(this._logger);
-    //    }
+    internal override async Task HandleMessageAsync(ProcessMessage message)
+    {
+        Verify.NotNull(message, nameof(message));
 
-    //    if (message.Values.Count != 1)
-    //    {
-    //        throw new KernelException("The proxy step can only handle 1 parameter object").Log(this._logger);
-    //    }
+        // Lazy one-time initialization of the step before processing a message
+        await this._activateTask.Value.ConfigureAwait(false);
 
-    //    var kvp = message.Values.Single();
+        if (this._externalMessageChannels.Count == 0)
+        {
+            throw new KernelException("The proxy step requires a channel id be provided").Log(this._logger);
+        }
 
-    //    if (this._inputs.TryGetValue(message.FunctionName, out Dictionary<string, object?>? functionName) && functionName != null && functionName.TryGetValue(kvp.Key, out object? parameterName) && parameterName != null)
-    //    {
-    //        this._logger.LogWarning("Step {StepName} already has input for {FunctionName}.{Key}, it is being overwritten with a message from Step named '{SourceId}'.", this.Name, message.FunctionName, kvp.Key, message.SourceId);
-    //    }
+        if (this._functions is null || this._inputs is null || this._initialInputs is null)
+        {
+            throw new KernelException("The step has not been initialized.").Log(this._logger);
+        }
 
-    //    if (!this._inputs.TryGetValue(message.FunctionName, out Dictionary<string, object?>? functionParameters))
-    //    {
-    //        this._inputs[message.FunctionName] = [];
-    //        functionParameters = this._inputs[message.FunctionName];
-    //    }
+        if (message.Values.Count != 1)
+        {
+            throw new KernelException("The proxy step can only handle 1 parameter object").Log(this._logger);
+        }
 
-    //    if (this._proxy.ProxyMetadata != null && message.SourceEventId != null && this._proxy.ProxyMetadata.EventMetadata.TryGetValue(message.SourceEventId, out var metadata) && metadata != null)
-    //    {
-    //        functionParameters![kvp.Key] = KernelProcessProxyMessageFactory.CreateProxyMessage(this.ParentProcessId!, message.SourceEventId, metadata.TopicName, kvp.Value);
-    //    }
-    //}
+        if (string.IsNullOrWhiteSpace(message.ProxyInfo?.TopicId))
+        {
+            throw new KernelException("The proxy step requires a topic id be provided").Log(this._logger);
+        }
+
+        IExternalKernelProcessMessageChannel? channel = null;
+
+        // If there is no channelId provided, there can only be one channel
+        if (string.IsNullOrEmpty(message.ProxyInfo.ChannelKey))
+        {
+            if (this._externalMessageChannels.Count > 1)
+            {
+                throw new KernelException("The proxy step requires a channel id be provided").Log(this._logger);
+            }
+
+            channel = this._externalMessageChannels.Single().Value;
+        }
+        else
+        {
+            channel = this._externalMessageChannels[message.ProxyInfo.ChannelKey];
+        }
+
+        if (channel is null)
+        {
+            throw new KernelException("The proxy step requires a channel id be provided").Log(this._logger);
+        }
+
+        // Add the message values to the inputs for the function
+        var kvp = message.Values.Single();
+        var proxyMessage = KernelProcessProxyMessageFactory.CreateProxyMessage(this.ParentProcessId!, message.SourceEventId, message.ProxyInfo.TopicId, kvp.Value);
+        await channel.EmitExternalEventAsync(proxyMessage.ExternalTopicName, proxyMessage).ConfigureAwait(false);
+    }
 
     /// <inheritdoc/>
     protected override async ValueTask InitializeStepAsync()

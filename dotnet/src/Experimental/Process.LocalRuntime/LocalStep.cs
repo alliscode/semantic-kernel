@@ -18,7 +18,6 @@ namespace Microsoft.SemanticKernel;
 internal class LocalStep : IKernelProcessMessageChannel
 {
     private readonly Queue<ProcessEvent> _outgoingEventQueue = new();
-    private readonly Lazy<ValueTask> _initializeTask;
     private readonly ILogger _logger;
 
     protected readonly Kernel _kernel;
@@ -28,6 +27,7 @@ internal class LocalStep : IKernelProcessMessageChannel
     protected Dictionary<string, Dictionary<string, object?>?>? _inputs = [];
     protected Dictionary<string, Dictionary<string, object?>?>? _initialInputs = [];
     protected Dictionary<string, List<KernelProcessEdge>> _outputEdges;
+    protected Lazy<ValueTask> _activateTask;
 
     internal KernelProcessStep? _stepInstance = null;
     internal readonly KernelProcessStepInfo _stepInfo;
@@ -56,7 +56,7 @@ internal class LocalStep : IKernelProcessMessageChannel
         this._kernel = kernel;
         this._stepInfo = stepInfo;
         this._stepState = stepInfo.State;
-        this._initializeTask = new Lazy<ValueTask>(this.InitializeStepAsync);
+        this._activateTask = new Lazy<ValueTask>(this.InitializeStepAsync);
         this._logger = this._kernel.LoggerFactory?.CreateLogger(this._stepInfo.InnerStepType) ?? new NullLogger<LocalStep>();
         this._outputEdges = this._stepInfo.Edges.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToList());
         this._eventNamespace = $"{this._stepInfo.State.Name}_{this._stepInfo.State.Id}";
@@ -169,7 +169,7 @@ internal class LocalStep : IKernelProcessMessageChannel
         Verify.NotNull(message, nameof(message));
 
         // Lazy one-time initialization of the step before processing a message
-        await this._initializeTask.Value.ConfigureAwait(false);
+        await this._activateTask.Value.ConfigureAwait(false);
 
         if (this._functions is null || this._inputs is null || this._initialInputs is null)
         {
@@ -313,7 +313,7 @@ internal class LocalStep : IKernelProcessMessageChannel
     {
         // Lazy one-time initialization of the step before extracting state information.
         // This allows state information to be extracted even if the step has not been activated.
-        await this._initializeTask.Value.ConfigureAwait(false);
+        await this._activateTask.Value.ConfigureAwait(false);
 
         KernelProcessStepInfo stepInfo = new(this._stepInfo.InnerStepType, this._stepState!, this._outputEdges);
         return stepInfo;

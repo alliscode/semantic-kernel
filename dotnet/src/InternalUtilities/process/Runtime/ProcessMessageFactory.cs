@@ -30,7 +30,7 @@ internal static class ProcessMessageFactory
             SourceEventId = sourceEventId,
             TargetEventId = target.TargetEventId,
             TargetEventData = data,
-            Extras = edge.Extras
+            ProxyInfo = ProcessEdgeProxyInfo.FromKernelProcessEdgeProxyInfo(edge.ProxyInfo)
         };
 
         return newMessage;
