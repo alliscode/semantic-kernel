@@ -11,6 +11,7 @@ using Dapr.Actors.Runtime;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.SemanticKernel.Process.Interfaces;
 using Microsoft.SemanticKernel.Process.Internal;
 using Microsoft.SemanticKernel.Process.Runtime;
 using Microsoft.SemanticKernel.Process.Serialization;
@@ -447,6 +448,10 @@ internal class StepActor : Actor, IStep, IKernelProcessMessageChannel
             await targetStep.EnqueueAsync(message.ToJson()).ConfigureAwait(false);
             foundEdge = true;
         }
+
+        // Send the event to the event streamer
+        ActorId eventStreamerId = new ActorId(this.ParentProcessId);
+        IEventPoll eventStreamer = this.ProxyFactory.CreateActorProxy<IEventPoll>(eventStreamerId, nameof(EventPollActor));
 
         // Error event was raised with no edge to handle it, send it to the global error event buffer.
         if (!foundEdge && daprEvent.IsError && this.ParentProcessId != null)

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Dapr.Actors.Runtime;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.SemanticKernel.Process;
+using Microsoft.SemanticKernel.Process.Actors;
 
 namespace Microsoft.SemanticKernel;
 
@@ -27,6 +28,13 @@ public static class KernelProcessDaprExtensions
         actorOptions.Actors.RegisterActor<MessageBufferActor>();
         actorOptions.Actors.RegisterActor<ExternalEventBufferActor>();
         actorOptions.Actors.RegisterActor<ExternalMessageBufferActor>();
+        actorOptions.Actors.RegisterActor<EventPollActor>(typeOptions: new()
+        {
+            ReentrancyConfig = new()
+            {
+                Enabled = true,
+            }
+        });
     }
 
     public static void AddExternalChannels(this IServiceCollection sc)
