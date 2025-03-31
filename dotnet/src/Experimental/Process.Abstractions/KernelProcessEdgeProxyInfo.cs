@@ -1,4 +1,6 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
+using System.Runtime.Serialization;
+
 namespace Microsoft.SemanticKernel;
 
 /// <summary>
@@ -9,8 +11,18 @@ namespace Microsoft.SemanticKernel;
 /// </remarks>
 /// <param name="TopicId">The Id of the topic the edge is targeting.</param>
 /// <param name="ChannelKey">The key associated with the messaging channel that the edge is targeting.</param>
-public record KernelProcessEdgeProxyInfo(
-    string TopicId,
-    string? ChannelKey)
+[DataContract]
+public class KernelProcessEdgeProxyInfo
 {
+    [DataMember]
+    public string TopicId { get; set; }
+
+    [DataMember]
+    public string? ChannelKey { get; set; }
+
+    public KernelProcessEdgeProxyInfo(string topicId, string? channelKey)
+    {
+        this.TopicId = topicId;
+        this.ChannelKey = channelKey;
+    }
 }

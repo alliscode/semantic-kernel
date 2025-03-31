@@ -200,7 +200,7 @@ public sealed class ProcessCloudEventsTests : IClassFixture<ProcessTestFixture>
 
         echoStep
             .OnFunctionResult()
-            .EmitExternalEvent(MockTopicNames.EchoExternalTopic);
+            .EmitExternalEvent(MockTopicNames.EchoExternalTopic, "mySignalR");
 
         repeatStep
             .OnEvent(ProcessTestsEvents.OutputReadyInternal)

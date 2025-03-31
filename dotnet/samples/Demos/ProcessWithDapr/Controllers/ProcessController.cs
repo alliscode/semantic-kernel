@@ -35,8 +35,10 @@ public class ProcessController : ControllerBase
     public async Task<IActionResult> PostAsync(string processId)
     {
         var process = this.GetProcess();
+
+        DaprKernelProcessContext? processContext = null;
         //var processContext = await process.StartAsync(new KernelProcessEvent() { Id = CommonEvents.StartProcess }, processId: processId);
-        var processContext = await this._processFactory.StartAsync(process, new KernelProcessEvent() { Id = CommonEvents.StartProcess }, processId: processId, (eventData) =>
+        processContext = await this._processFactory.StartAsync(process, new KernelProcessEvent() { Id = CommonEvents.StartProcess }, processId: processId, (eventData) =>
         {
             int x = 3;
             return Task.CompletedTask;

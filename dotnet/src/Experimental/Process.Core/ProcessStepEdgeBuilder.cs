@@ -84,7 +84,7 @@ public sealed class ProcessStepEdgeBuilder
     {
         var processBuilder = this.Source.ProcessBuilder;
 
-        this.ProxyInfo ??= new(TopicId: topicName, ChannelKey: channelKey);
+        this.ProxyInfo ??= new(topicId: topicName, channelKey: channelKey);
 
         if (processBuilder is null)
         {
@@ -104,7 +104,7 @@ public sealed class ProcessStepEdgeBuilder
     {
         var processBuilder = this.Source.ProcessBuilder;
 
-        this.ProxyInfo ??= new(TopicId: "LocalProxy", ChannelKey: "LocalProxy");
+        this.ProxyInfo ??= new(topicId: "LocalProxy", channelKey: "LocalProxy");
 
         if (processBuilder is null)
         {

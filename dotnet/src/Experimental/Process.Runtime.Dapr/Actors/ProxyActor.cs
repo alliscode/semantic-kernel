@@ -102,6 +102,5 @@ internal sealed class ProxyActor : StepActor, IProxy
         {
             await kvp.Value.Initialize().ConfigureAwait(false);
         }
-
     }
 }
