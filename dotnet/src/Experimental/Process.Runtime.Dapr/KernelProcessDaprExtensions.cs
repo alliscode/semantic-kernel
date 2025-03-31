@@ -27,6 +27,13 @@ public static class KernelProcessDaprExtensions
         actorOptions.Actors.RegisterActor<MessageBufferActor>();
         actorOptions.Actors.RegisterActor<ExternalEventBufferActor>();
         actorOptions.Actors.RegisterActor<ExternalMessageBufferActor>();
+        actorOptions.Actors.RegisterActor<EventPollActor>(typeOptions: new()
+        {
+            ReentrancyConfig = new()
+            {
+                Enabled = true,
+            }
+        });
     }
 
     public static void AddExternalChannels(this IServiceCollection sc)

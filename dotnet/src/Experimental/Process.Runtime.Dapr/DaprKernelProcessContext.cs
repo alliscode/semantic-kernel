@@ -1,10 +1,13 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
 using System;
+using System.Diagnostics;
+using System.Threading;
 using System.Threading.Tasks;
 using Dapr.Actors;
 using Dapr.Actors.Client;
 using Microsoft.SemanticKernel.Process;
+using Microsoft.SemanticKernel.Process.Interfaces;
 using Microsoft.SemanticKernel.Process.Serialization;
 
 namespace Microsoft.SemanticKernel;
@@ -16,6 +19,7 @@ public class DaprKernelProcessContext : KernelProcessContext
 {
     private readonly IProcess _daprProcess;
     private readonly KernelProcess _process;
+    private readonly ActorId _processId;
 
     internal DaprKernelProcessContext(KernelProcess process)
     {
@@ -28,8 +32,8 @@ public class DaprKernelProcessContext : KernelProcessContext
         }
 
         this._process = process;
-        var processId = new ActorId(process.State.Id);
-        this._daprProcess = ActorProxy.Create<IProcess>(processId, nameof(ProcessActor));
+        this._processId = new ActorId(process.State.Id);
+        this._daprProcess = ActorProxy.Create<IProcess>(this._processId, nameof(ProcessActor));
     }
 
     /// <summary>
@@ -39,8 +43,25 @@ public class DaprKernelProcessContext : KernelProcessContext
     /// <param name="eventProxyStepId">An optional identifier of an actor requesting to proxy events.</param>
     internal async Task StartWithEventAsync(KernelProcessEvent initialEvent, ActorId? eventProxyStepId = null)
     {
+        IEventPoll eventStream = ActorProxy.Create<IEventPoll>(this._processId, nameof(EventPollActor));
+        using CancellationTokenSource tcs = new();
+
         try
         {
+            _ = Task.Run(async () =>
+            {
+                while (true)
+                {
+                    if (tcs.IsCancellationRequested)
+                    {
+                        return;
+                    }
+
+                    // Check if the process is still running.
+                    var events = await eventStream.GetAvailableAsync().ConfigureAwait(false);
+                }
+            }).ConfigureAwait(false);
+
             var daprProcess = DaprProcessInfo.FromKernelProcess(this._process);
             await this._daprProcess.InitializeProcessAsync(daprProcess, null, eventProxyStepId?.GetId()).ConfigureAwait(false);
             await this._daprProcess.RunOnceAsync(initialEvent.ToJson()).ConfigureAwait(false);
@@ -48,6 +69,11 @@ public class DaprKernelProcessContext : KernelProcessContext
         catch (Exception ex)
         {
             int x = 3;
+        }
+        finally
+        {
+            // Cancel the event stream task.
+            tcs.Cancel();
         }
     }
 
