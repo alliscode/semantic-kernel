@@ -2,7 +2,6 @@
 
 using System;
 using System.ClientModel;
-using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.AudioToText;
@@ -20,10 +19,7 @@ namespace SemanticKernel.Connectors.OpenAI.UnitTests.Extensions;
 
 public class KernelBuilderExtensionsTests
 {
-    private const string ObsoleteMessage = "This test is in a deprecated feature will be removed in a future version.";
-
     [Fact]
-    [Obsolete(ObsoleteMessage)]
     public void ItCanAddTextEmbeddingGenerationService()
     {
         // Arrange
@@ -39,7 +35,6 @@ public class KernelBuilderExtensionsTests
     }
 
     [Fact]
-    [Obsolete(ObsoleteMessage)]
     public void ItCanAddTextEmbeddingGenerationServiceWithOpenAIClient()
     {
         // Arrange
@@ -52,36 +47,6 @@ public class KernelBuilderExtensionsTests
 
         // Assert
         Assert.Equal("model", service.Attributes[AIServiceExtensions.ModelIdKey]);
-    }
-
-    [Fact]
-    public void ItCanAddEmbeddingGenerator()
-    {
-        // Arrange
-        var sut = Kernel.CreateBuilder();
-
-        // Act
-        var service = sut.AddOpenAIEmbeddingGenerator("model", "key")
-            .Build()
-            .GetRequiredService<IEmbeddingGenerator<string, Embedding<float>>>();
-
-        // Assert
-        Assert.Equal("model", service.GetService<EmbeddingGeneratorMetadata>()!.DefaultModelId);
-    }
-
-    [Fact]
-    public void ItCanAddEmbeddingGeneratorServiceWithOpenAIClient()
-    {
-        // Arrange
-        var sut = Kernel.CreateBuilder();
-
-        // Act
-        var service = sut.AddOpenAIEmbeddingGenerator("model", new OpenAIClient(new ApiKeyCredential("key")))
-            .Build()
-            .GetRequiredService<IEmbeddingGenerator<string, Embedding<float>>>();
-
-        // Assert
-        Assert.Equal("model", service.GetService<EmbeddingGeneratorMetadata>()!.DefaultModelId);
     }
 
     [Fact]
@@ -145,7 +110,7 @@ public class KernelBuilderExtensionsTests
     }
 
     [Fact]
-    [Obsolete(ObsoleteMessage)]
+    [Obsolete("This test is deprecated and will be removed in a future version.")]
     public void ItCanAddFileService()
     {
         // Arrange

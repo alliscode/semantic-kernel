@@ -3,7 +3,6 @@
 using System;
 using System.Net.Http;
 using System.Reflection;
-using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
@@ -14,7 +13,7 @@ using Xunit;
 namespace SemanticKernel.Connectors.MistralAI.UnitTests;
 
 /// <summary>
-/// Unit tests for <see cref="Microsoft.Extensions.DependencyInjection.MistralAIServiceCollectionExtensions"/> and <see cref="Microsoft.SemanticKernel.MistralAIKernelBuilderExtensions"/>.
+/// Unit tests for <see cref="MistralAIServiceCollectionExtensions"/> and <see cref="MistralAIKernelBuilderExtensions"/>.
 /// </summary>
 public class MistralAIExtensionTests
 {
@@ -36,7 +35,6 @@ public class MistralAIExtensionTests
     }
 
     [Fact]
-    [Obsolete("This test is deprecated and will be removed in a future release.")]
     public void AddMistralTextEmbeddingGenerationToServiceCollection()
     {
         // Arrange
@@ -51,22 +49,6 @@ public class MistralAIExtensionTests
         // Assert
         Assert.NotNull(service);
         Assert.IsType<MistralAITextEmbeddingGenerationService>(service);
-    }
-
-    [Fact]
-    public void AddMistralAIEmbeddingGeneratorToServiceCollection()
-    {
-        // Arrange
-        var collection = new ServiceCollection();
-        collection.AddMistralEmbeddingGenerator("model", "apiKey");
-
-        // Act
-        var kernelBuilder = collection.AddKernel();
-        var kernel = collection.BuildServiceProvider().GetRequiredService<Kernel>();
-        var service = kernel.GetRequiredService<IEmbeddingGenerator<string, Embedding<float>>>();
-
-        // Assert
-        Assert.NotNull(service);
     }
 
     [Fact]
@@ -87,7 +69,6 @@ public class MistralAIExtensionTests
     }
 
     [Fact]
-    [Obsolete("This test is deprecated and will be removed in a future release.")]
     public void AddMistralTextEmbeddingGenerationToKernelBuilder()
     {
         // Arrange
@@ -102,22 +83,6 @@ public class MistralAIExtensionTests
         // Assert
         Assert.NotNull(service);
         Assert.IsType<MistralAITextEmbeddingGenerationService>(service);
-    }
-
-    [Fact]
-    public void AddMistralAIEmbeddingGeneratorToKernelBuilder()
-    {
-        // Arrange
-        var collection = new ServiceCollection();
-        var kernelBuilder = collection.AddKernel();
-        kernelBuilder.AddMistralEmbeddingGenerator("model", "apiKey");
-
-        // Act
-        var kernel = collection.BuildServiceProvider().GetRequiredService<Kernel>();
-        var service = kernel.GetRequiredService<IEmbeddingGenerator<string, Embedding<float>>>();
-
-        // Assert
-        Assert.NotNull(service);
     }
 
     [Theory]

@@ -16,12 +16,10 @@ public sealed class OpenAIJsonSchemaTransformerTests
 {
     private static readonly AIJsonSchemaCreateOptions s_jsonSchemaCreateOptions = new()
     {
-        TransformOptions = new()
-        {
-            DisallowAdditionalProperties = true,
-            RequireAllProperties = true,
-            MoveDefaultKeywordToDescription = true,
-        }
+        IncludeSchemaKeyword = false,
+        IncludeTypeInEnumSchemas = true,
+        DisallowAdditionalProperties = true,
+        RequireAllProperties = true,
     };
 
     private static readonly JsonSerializerOptions s_jsonSerializerOptions = new()

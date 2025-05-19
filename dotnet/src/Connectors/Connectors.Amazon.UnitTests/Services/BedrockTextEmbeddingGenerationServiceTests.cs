@@ -16,7 +16,6 @@ namespace Microsoft.SemanticKernel.Connectors.Amazon.UnitTests;
 /// <summary>
 /// Unit tests for Bedrock Text Embedding Generation Service.
 /// </summary>
-[Obsolete("Temporary test for obsoleted BedrockTextEmbedding.")]
 public sealed class BedrockTextEmbeddingGenerationServiceTests
 {
     /// <summary>

@@ -16,7 +16,6 @@ using Xunit;
 
 namespace SemanticKernel.IntegrationTests.Connectors.Onnx;
 
-[Obsolete("Temporary test for Obsoleted BertOnnxTextEmbeddingGenerationService.")]
 public class BertOnnxTextEmbeddingGenerationServiceTests
 {
     private static readonly HttpClient s_client = new();

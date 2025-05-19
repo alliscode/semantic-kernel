@@ -28,7 +28,7 @@ public static class OllamaServiceCollectionExtensions
     /// <param name="modelId">The model for text generation.</param>
     /// <param name="endpoint">The endpoint to Ollama hosted service.</param>
     /// <param name="serviceId">The optional service ID.</param>
-    /// <returns>The updated service collection.</returns>
+    /// <returns>The updated kernel builder.</returns>
     public static IServiceCollection AddOllamaTextGeneration(
         this IServiceCollection services,
         string modelId,
@@ -53,7 +53,7 @@ public static class OllamaServiceCollectionExtensions
     /// <param name="modelId">The model for text generation.</param>
     /// <param name="httpClient">Optional custom HttpClient, picked from ServiceCollection if not provided.</param>
     /// <param name="serviceId">The optional service ID.</param>
-    /// <returns>The updated service collection.</returns>
+    /// <returns>The updated kernel builder.</returns>
     public static IServiceCollection AddOllamaTextGeneration(
         this IServiceCollection services,
         string modelId,
@@ -72,13 +72,13 @@ public static class OllamaServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Add Ollama Text Generation service to the service collection.
+    /// Add Ollama Text Generation service to the kernel builder.
     /// </summary>
     /// <param name="services">The target service collection.</param>
     /// <param name="modelId">The model for text generation.</param>
     /// <param name="ollamaClient">The Ollama Sharp library client.</param>
     /// <param name="serviceId">The optional service ID.</param>
-    /// <returns>The updated service collection.</returns>
+    /// <returns>The updated kernel builder.</returns>
     public static IServiceCollection AddOllamaTextGeneration(
         this IServiceCollection services,
         string modelId,
@@ -99,12 +99,12 @@ public static class OllamaServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Add Ollama Text Generation service to the service collection.
+    /// Add Ollama Text Generation service to the kernel builder.
     /// </summary>
     /// <param name="services">The target service collection.</param>
     /// <param name="ollamaClient">The Ollama Sharp library client.</param>
     /// <param name="serviceId">The optional service ID.</param>
-    /// <returns>The updated service collection.</returns>
+    /// <returns>The updated kernel builder.</returns>
     public static IServiceCollection AddOllamaTextGeneration(
         this IServiceCollection services,
         OllamaApiClient? ollamaClient = null,
@@ -204,12 +204,12 @@ public static class OllamaServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Add Ollama Chat Completion service to the service collection.
+    /// Add Ollama Chat Completion service to the kernel builder.
     /// </summary>
     /// <param name="services">The target service collection.</param>
     /// <param name="ollamaClient">The Ollama Sharp library client.</param>
     /// <param name="serviceId">The optional service ID.</param>
-    /// <returns>The updated service collection.</returns>
+    /// <returns>The updated kernel builder.</returns>
     public static IServiceCollection AddOllamaChatCompletion(
         this IServiceCollection services,
         OllamaApiClient? ollamaClient = null,
@@ -248,14 +248,13 @@ public static class OllamaServiceCollectionExtensions
     #region Text Embeddings
 
     /// <summary>
-    /// Add Ollama Text Embedding Generation services to the service collection.
+    /// Add Ollama Text Embedding Generation services to the kernel builder.
     /// </summary>
     /// <param name="services">The target service collection.</param>
     /// <param name="modelId">The model for text generation.</param>
     /// <param name="endpoint">The endpoint to Ollama hosted service.</param>
     /// <param name="serviceId">Optional service ID.</param>
-    /// <returns>The updated service collection.</returns>
-    [Obsolete("Use AddOllamaEmbeddingGenerator instead.")]
+    /// <returns>The updated kernel builder.</returns>
     public static IServiceCollection AddOllamaTextEmbeddingGeneration(
         this IServiceCollection services,
         string modelId,
@@ -281,14 +280,13 @@ public static class OllamaServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Add Ollama Text Embedding Generation services to the service collection.
+    /// Add Ollama Text Embedding Generation services to the kernel builder.
     /// </summary>
     /// <param name="services">The target service collection.</param>
     /// <param name="modelId">The model for text generation.</param>
     /// <param name="httpClient">Optional custom HttpClient, picked from ServiceCollection if not provided.</param>
     /// <param name="serviceId">Optional service ID.</param>
-    /// <returns>The updated service collection.</returns>
-    [Obsolete("Use AddOllamaEmbeddingGenerator instead.")]
+    /// <returns>The updated kernel builder.</returns>
     public static IServiceCollection AddOllamaTextEmbeddingGeneration(
         this IServiceCollection services,
         string modelId,
@@ -318,13 +316,12 @@ public static class OllamaServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Add Ollama Text Embeddings Generation service to the service collection.
+    /// Add Ollama Text Embeddings Generation service to the kernel builder.
     /// </summary>
     /// <param name="services">The target service collection.</param>
     /// <param name="ollamaClient">The Ollama Sharp library client.</param>
     /// <param name="serviceId">The optional service ID.</param>
-    /// <returns>The updated service collection.</returns>
-    [Obsolete("Use AddOllamaEmbeddingGenerator instead.")]
+    /// <returns>The updated kernel builder.</returns>
     public static IServiceCollection AddOllamaTextEmbeddingGeneration(
         this IServiceCollection services,
         OllamaApiClient? ollamaClient = null,

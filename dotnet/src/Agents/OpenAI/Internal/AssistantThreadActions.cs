@@ -401,7 +401,7 @@ internal static class AssistantThreadActions
                     switch (contentUpdate.UpdateKind)
                     {
                         case StreamingUpdateReason.MessageUpdated:
-                            yield return GenerateStreamingMessageContent(agent.GetName(), run!, contentUpdate, logger);
+                            yield return GenerateStreamingMessageContent(agent.GetName(), contentUpdate);
                             break;
                     }
                 }
@@ -540,7 +540,7 @@ internal static class AssistantThreadActions
         logger.LogOpenAIAssistantCompletedRun(nameof(InvokeAsync), run?.Id ?? "Failed", threadId);
     }
 
-    private static ChatMessageContent GenerateMessageContent(string? assistantName, ThreadMessage message, RunStep? completedStep = null, ILogger? logger = null)
+    private static ChatMessageContent GenerateMessageContent(string? assistantName, ThreadMessage message, RunStep? completedStep = null)
     {
         AuthorRole role = new(message.Role.ToString());
 
@@ -564,7 +564,6 @@ internal static class AssistantThreadActions
             new(role, content: null)
             {
                 AuthorName = assistantName,
-                InnerContent = message,
                 Metadata = metadata,
             };
 
@@ -577,15 +576,7 @@ internal static class AssistantThreadActions
 
                 foreach (TextAnnotation annotation in itemContent.TextAnnotations)
                 {
-                    AnnotationContent? annotationItem = GenerateAnnotationContent(annotation);
-                    if (annotationItem is not null)
-                    {
-                        content.Items.Add(annotationItem);
-                    }
-                    else
-                    {
-                        logger?.LogOpenAIAssistantUnknownAnnotation(nameof(GenerateMessageContent), message.RunId, message.ThreadId, annotation.GetType());
-                    }
+                    content.Items.Add(GenerateAnnotationContent(annotation));
                 }
             }
             // Process image content
@@ -599,13 +590,12 @@ internal static class AssistantThreadActions
     }
 
     [ExcludeFromCodeCoverage]
-    private static StreamingChatMessageContent GenerateStreamingMessageContent(string? assistantName, ThreadRun run, MessageContentUpdate update, ILogger? logger)
+    private static StreamingChatMessageContent GenerateStreamingMessageContent(string? assistantName, MessageContentUpdate update)
     {
         StreamingChatMessageContent content =
             new(AuthorRole.Assistant, content: null)
             {
                 AuthorName = assistantName,
-                InnerContent = update,
             };
 
         // Process text content
@@ -621,15 +611,7 @@ internal static class AssistantThreadActions
         // Process annotations
         else if (update.TextAnnotation != null)
         {
-            StreamingAnnotationContent? annotationItem = GenerateStreamingAnnotationContent(update.TextAnnotation);
-            if (annotationItem is not null)
-            {
-                content.Items.Add(annotationItem);
-            }
-            else
-            {
-                logger?.LogOpenAIAssistantUnknownAnnotation(nameof(GenerateMessageContent), run.Id, run.ThreadId, update.TextAnnotation.GetType());
-            }
+            content.Items.Add(GenerateStreamingAnnotationContent(update.TextAnnotation));
         }
 
         if (update.Role.HasValue && update.Role.Value != MessageRole.User)
@@ -670,63 +652,49 @@ internal static class AssistantThreadActions
         return content.Items.Count > 0 ? content : null;
     }
 
-    private static AnnotationContent? GenerateAnnotationContent(TextAnnotation annotation)
+    private static AnnotationContent GenerateAnnotationContent(TextAnnotation annotation)
     {
-        string referenceId;
-        AnnotationKind kind;
+        string? fileId = null;
 
         if (!string.IsNullOrEmpty(annotation.OutputFileId))
         {
-            referenceId = annotation.OutputFileId;
-            kind = AnnotationKind.TextCitation;
+            fileId = annotation.OutputFileId;
         }
         else if (!string.IsNullOrEmpty(annotation.InputFileId))
         {
-            referenceId = annotation.InputFileId;
-            kind = AnnotationKind.FileCitation;
-        }
-        else
-        {
-            return null;
+            fileId = annotation.InputFileId;
         }
 
         return
-            new(kind, label: annotation.TextToReplace, referenceId)
+            new(annotation.TextToReplace)
             {
-                InnerContent = annotation,
+                Quote = annotation.TextToReplace,
                 StartIndex = annotation.StartIndex,
                 EndIndex = annotation.EndIndex,
+                FileId = fileId,
             };
     }
 
     [ExcludeFromCodeCoverage]
-    private static StreamingAnnotationContent? GenerateStreamingAnnotationContent(TextAnnotationUpdate annotation)
+    private static StreamingAnnotationContent GenerateStreamingAnnotationContent(TextAnnotationUpdate annotation)
     {
-        string referenceId;
-        AnnotationKind kind;
+        string? fileId = null;
 
         if (!string.IsNullOrEmpty(annotation.OutputFileId))
         {
-            referenceId = annotation.OutputFileId;
-            kind = AnnotationKind.TextCitation;
+            fileId = annotation.OutputFileId;
         }
         else if (!string.IsNullOrEmpty(annotation.InputFileId))
         {
-            referenceId = annotation.InputFileId;
-            kind = AnnotationKind.FileCitation;
-        }
-        else
-        {
-            return null;
+            fileId = annotation.InputFileId;
         }
 
         return
-            new(kind, referenceId)
+            new(annotation.TextToReplace)
             {
-                Label = annotation.TextToReplace,
-                InnerContent = annotation,
-                StartIndex = annotation.StartIndex,
-                EndIndex = annotation.EndIndex,
+                StartIndex = annotation.StartIndex ?? 0,
+                EndIndex = annotation.EndIndex ?? 0,
+                FileId = fileId,
             };
     }
 

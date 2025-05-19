@@ -1,7 +1,6 @@
 # Copyright (c) Microsoft. All rights reserved.
 
 import re
-import sys
 from collections.abc import Callable
 
 from defusedxml import ElementTree as ET
@@ -13,11 +12,6 @@ from semantic_kernel.functions.kernel_function import KernelFunction
 from semantic_kernel.kernel import Kernel
 from semantic_kernel.planners.plan import Plan
 
-if sys.version_info >= (3, 13):
-    from warnings import deprecated
-else:
-    from typing_extensions import deprecated
-
 # Constants
 GOAL_TAG = "goal"
 SOLUTION_TAG = "plan"
@@ -26,7 +20,6 @@ SET_CONTEXT_VARIABLE_TAG = "setContextVariable"
 APPEND_TO_RESULT_TAG = "appendToResult"
 
 
-@deprecated("Will be removed in a future version.")
 class SequentialPlanParser:
     """Parser for Sequential planners."""
 

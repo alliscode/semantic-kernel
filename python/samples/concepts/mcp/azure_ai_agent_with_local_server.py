@@ -6,7 +6,11 @@ from pathlib import Path
 
 from azure.identity.aio import DefaultAzureCredential
 
-from semantic_kernel.agents import AzureAIAgent, AzureAIAgentSettings, AzureAIAgentThread
+from semantic_kernel.agents import (
+    AzureAIAgent,
+    AzureAIAgentSettings,
+    AzureAIAgentThread,
+)
 from semantic_kernel.connectors.mcp import MCPStdioPlugin
 from semantic_kernel.functions import KernelArguments
 

@@ -1,6 +1,5 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
-using System;
 using Amazon.BedrockRuntime;
 using Amazon.Runtime;
 using Microsoft.SemanticKernel.ChatCompletion;
@@ -63,7 +62,6 @@ public class BedrockKernelBuilderExtensionTests
     /// Checks that AddBedrockTextEmbeddingGenerationService builds a proper kernel with a non-null bedrockRuntime.
     /// </summary>
     [Fact]
-    [Obsolete("This test is deprecated and will be removed in a future release.")]
     public void AddBedrockTextEmbeddingGenerationCreatesServiceWithNonNullBedrockRuntime()
     {
         // Arrange

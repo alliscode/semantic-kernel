@@ -43,7 +43,7 @@ public sealed class VectorStoreRecordVectorPropertyModel<TInput>(string modelNam
                     this.GetValueAsObject(record) is var value && value is TInput s
                         ? s
                         : throw new InvalidOperationException($"Property '{this.ModelName}' was configured with an embedding generator accepting a {nameof(TInput)}, but {value?.GetType().Name ?? "null"} was provided."),
-                    options: null,
+                    new() { Dimensions = this.Dimensions },
                     cancellationToken);
                 return true;
 
@@ -66,8 +66,7 @@ public sealed class VectorStoreRecordVectorPropertyModel<TInput>(string modelNam
                     records.Select(r => this.GetValueAsObject(r) is var value && value is TInput s
                         ? s
                         : throw new InvalidOperationException($"Property '{this.ModelName}' was configured with an embedding generator accepting a string, but {value?.GetType().Name ?? "null"} was provided.")),
-                    options: null,
-                    cancellationToken);
+                    new() { Dimensions = this.Dimensions }, cancellationToken);
                 return true;
 
             case null:

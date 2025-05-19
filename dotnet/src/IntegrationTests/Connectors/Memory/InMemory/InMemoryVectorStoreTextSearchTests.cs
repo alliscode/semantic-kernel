@@ -2,11 +2,10 @@
 
 using System;
 using System.Threading.Tasks;
-using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.SemanticKernel.Connectors.InMemory;
+using Microsoft.SemanticKernel.Connectors.OpenAI;
 using Microsoft.SemanticKernel.Data;
-using OpenAI;
 using SemanticKernel.IntegrationTests.Data;
 using SemanticKernel.IntegrationTests.TestSettings;
 using Xunit;
@@ -27,10 +26,7 @@ public class InMemoryVectorStoreTextSearchTests : BaseVectorStoreTextSearchTests
             Assert.NotNull(openAIConfiguration);
             Assert.NotNull(openAIConfiguration.ModelId);
             Assert.NotNull(openAIConfiguration.ApiKey);
-
-            this.EmbeddingGenerator = new OpenAIClient(openAIConfiguration.ApiKey)
-                .GetEmbeddingClient(openAIConfiguration.ModelId)
-                .AsIEmbeddingGenerator();
+            this.EmbeddingGenerator = new OpenAITextEmbeddingGenerationService(openAIConfiguration.ModelId, openAIConfiguration.ApiKey);
 
             // Delegate which will create a record.
             static DataModel CreateRecord(int index, string text, ReadOnlyMemory<float> embedding)
@@ -55,7 +51,9 @@ public class InMemoryVectorStoreTextSearchTests : BaseVectorStoreTextSearchTests
         var resultMapper = new DataModelTextSearchResultMapper();
 
         // TODO: Once OpenAITextEmbeddingGenerationService implements MEAI's IEmbeddingGenerator (#10811), configure it with the InMemoryVectorStore above instead of passing it here.
+#pragma warning disable CS0618 // VectorStoreTextSearch with ITextEmbeddingGenerationService is obsolete
         return new VectorStoreTextSearch<DataModel>(vectorSearch, this.EmbeddingGenerator!, stringMapper, resultMapper);
+#pragma warning restore CS0618
     }
 
     /// <inheritdoc/>

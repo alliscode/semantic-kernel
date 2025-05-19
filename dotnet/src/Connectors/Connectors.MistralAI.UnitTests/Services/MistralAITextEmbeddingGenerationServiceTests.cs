@@ -1,6 +1,5 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
-using System;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading.Tasks;
@@ -12,7 +11,6 @@ namespace SemanticKernel.Connectors.MistralAI.UnitTests.Services;
 /// <summary>
 /// Unit tests for <see cref="MistralAITextEmbeddingGenerationService"/>.
 /// </summary>
-[Obsolete("This class is deprecated and will be removed in a future release.")]
 public sealed class MistralAITextEmbeddingGenerationServiceTests : MistralTestBase
 {
     [Fact]

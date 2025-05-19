@@ -3,7 +3,7 @@
 using System;
 using System.Threading.Tasks;
 using Microsoft.SemanticKernel;
-using ModelContextProtocol.Protocol;
+using ModelContextProtocol.Protocol.Types;
 
 namespace MCPClient;
 

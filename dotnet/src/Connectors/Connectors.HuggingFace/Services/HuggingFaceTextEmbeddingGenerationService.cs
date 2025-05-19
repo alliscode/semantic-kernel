@@ -16,7 +16,6 @@ namespace Microsoft.SemanticKernel.Connectors.HuggingFace;
 /// <summary>
 /// HuggingFace embedding generation service.
 /// </summary>
-[Obsolete("Use HuggingFaceEmbeddingGenerator instead.")]
 public sealed class HuggingFaceTextEmbeddingGenerationService : ITextEmbeddingGenerationService
 {
     private Dictionary<string, object?> AttributesInternal { get; } = [];

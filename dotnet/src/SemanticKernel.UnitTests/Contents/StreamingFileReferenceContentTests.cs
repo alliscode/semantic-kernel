@@ -1,5 +1,4 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
-using System;
 using System.Text;
 using Microsoft.SemanticKernel;
 using Xunit;
@@ -19,7 +18,9 @@ public class StreamingFileReferenceContentTests
     [Fact]
     public void VerifyStreamingFileReferenceContentInitialState()
     {
-        Assert.Throws<ArgumentException>(() => new StreamingFileReferenceContent(string.Empty));
+        StreamingFileReferenceContent definition = new();
+
+        Assert.Empty(definition.FileId);
     }
     /// <summary>
     /// Verify usage.

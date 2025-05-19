@@ -1,6 +1,5 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
-using System;
 using System.Threading.Tasks;
 using Azure.Identity;
 using Microsoft.Extensions.Configuration;
@@ -11,7 +10,6 @@ using Xunit;
 
 namespace SemanticKernel.IntegrationTests.Connectors.AzureOpenAI;
 
-[Obsolete("Temporary Tests for Obsolete AzureOpenAITextEmbeddingGenerationService")]
 public sealed class AzureOpenAITextEmbeddingTests
 {
     public AzureOpenAITextEmbeddingTests()
@@ -43,7 +41,7 @@ public sealed class AzureOpenAITextEmbeddingTests
     [Theory]
     [InlineData(null, 3072)]
     [InlineData(1024, 1024)]
-    public async Task AzureOpenAITextEmbeddingGenerationWithDimensionsAsync(int? dimensions, int expectedVectorLength)
+    public async Task AzureOpenAIWithDimensionsAsync(int? dimensions, int expectedVectorLength)
     {
         // Arrange
         const string TestInputString = "test sentence";

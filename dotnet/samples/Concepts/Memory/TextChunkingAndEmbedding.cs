@@ -1,9 +1,7 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
-using System.ClientModel;
-using Azure.AI.OpenAI;
-using Microsoft.Extensions.AI;
 using Microsoft.ML.Tokenizers;
+using Microsoft.SemanticKernel.Connectors.AzureOpenAI;
 using Microsoft.SemanticKernel.Text;
 
 namespace Memory;
@@ -22,9 +20,10 @@ public class TextChunkingAndEmbedding(ITestOutputHelper output) : BaseTest(outpu
 
     private async Task RunExampleAsync()
     {
-        var embeddingGenerator = new AzureOpenAIClient(new Uri(TestConfiguration.AzureOpenAIEmbeddings.Endpoint), new ApiKeyCredential(TestConfiguration.AzureOpenAIEmbeddings.ApiKey))
-            .GetEmbeddingClient(TestConfiguration.AzureOpenAIEmbeddings.DeploymentName)
-            .AsIEmbeddingGenerator();
+        var embeddingGenerator = new AzureOpenAITextEmbeddingGenerationService(
+            deploymentName: EmbeddingModelName,
+            endpoint: TestConfiguration.AzureOpenAIEmbeddings.Endpoint,
+            apiKey: TestConfiguration.AzureOpenAIEmbeddings.ApiKey);
 
         // To demonstrate batching we'll create abnormally small partitions.
         var lines = TextChunker.SplitPlainTextLines(ChatTranscript, maxTokensPerLine: 10);
@@ -47,7 +46,7 @@ public class TextChunkingAndEmbedding(ITestOutputHelper output) : BaseTest(outpu
         for (var i = 0; i < chunks.Count; i++)
         {
             var chunk = chunks[i];
-            var embeddings = await embeddingGenerator.GenerateAsync(chunk);
+            var embeddings = await embeddingGenerator.GenerateEmbeddingsAsync(chunk);
 
             Console.WriteLine($"Generated {embeddings.Count} embeddings from chunk {i + 1}");
         }

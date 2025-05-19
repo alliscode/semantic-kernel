@@ -1,6 +1,5 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
-using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.SemanticKernel;
@@ -9,7 +8,6 @@ using Xunit;
 
 namespace SemanticKernel.IntegrationTests.Connectors.Amazon;
 
-[Obsolete("Temporary test for obsoleted BedrockTextEmbedding.")]
 public class BedrockTextEmbeddingTests
 {
     [Theory(Skip = "For manual verification only")]

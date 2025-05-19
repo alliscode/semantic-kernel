@@ -113,8 +113,8 @@ public sealed class SessionsPythonPluginTests : IDisposable
         var result = await this._sut.ExecuteCodeAsync(code);
 
         // Assert
-        Assert.Equal("Succeeded", result.Status);
-        Assert.Contains("8", result.ToString());
+        Assert.Contains("8", result);
+        Assert.Contains("Succeeded", result);
     }
 
     [Fact(Skip = SkipReason)]

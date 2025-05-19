@@ -9,8 +9,6 @@ using Microsoft.SemanticKernel.Embeddings;
 
 namespace Microsoft.SemanticKernel.Memory;
 
-#pragma warning disable CS0618 // Type or member is obsolete
-
 /// <summary>
 /// A builder for Memory plugin.
 /// </summary>

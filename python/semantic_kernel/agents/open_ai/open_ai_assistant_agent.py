@@ -6,6 +6,8 @@ from collections.abc import AsyncIterable, Awaitable, Callable, Iterable
 from copy import copy
 from typing import TYPE_CHECKING, Any, ClassVar, Literal
 
+from semantic_kernel.utils.feature_stage_decorator import release_candidate
+
 if sys.version_info >= (3, 12):
     from typing import override  # pragma: no cover
 else:
@@ -43,7 +45,6 @@ from semantic_kernel.functions import KernelArguments
 from semantic_kernel.functions.kernel_function import TEMPLATE_FORMAT_MAP
 from semantic_kernel.functions.kernel_plugin import KernelPlugin
 from semantic_kernel.schema.kernel_json_schema_builder import KernelJsonSchemaBuilder
-from semantic_kernel.utils.feature_stage_decorator import release_candidate
 from semantic_kernel.utils.naming import generate_random_ascii_name
 from semantic_kernel.utils.telemetry.agent_diagnostics.decorators import (
     trace_agent_get_response,
@@ -636,22 +637,21 @@ class OpenAIAssistantAgent(Agent):
         }
         run_level_params = {k: v for k, v in run_level_params.items() if v is not None}
 
-        async for is_visible, message in AssistantThreadActions.invoke(
+        async for is_visible, response in AssistantThreadActions.invoke(
             agent=self,
             thread_id=thread.id,
             kernel=kernel,
             arguments=arguments,
             **run_level_params,  # type: ignore
         ):
-            message.metadata["thread_id"] = thread.id
-            await thread.on_new_message(message)
+            response.metadata["thread_id"] = thread.id
+            await thread.on_new_message(response)
+
+            if on_intermediate_message:
+                await on_intermediate_message(response)
 
             if is_visible:
-                # Only yield visible messages
-                yield AgentResponseItem(message=message, thread=thread)
-            elif on_intermediate_message:
-                # Emit tool-related messages only via callback
-                await on_intermediate_message(message)
+                yield AgentResponseItem(message=response, thread=thread)
 
     @trace_agent_invocation
     @override
@@ -744,28 +744,21 @@ class OpenAIAssistantAgent(Agent):
 
         collected_messages: list[ChatMessageContent] | None = [] if on_intermediate_message else None
 
-        start_idx = 0
         async for message in AssistantThreadActions.invoke_stream(
             agent=self,
             thread_id=thread.id,
-            output_messages=collected_messages,
             kernel=kernel,
             arguments=arguments,
+            output_messages=collected_messages,
             **run_level_params,  # type: ignore
         ):
-            # Before yielding the current streamed message, emit any new full messages first
-            if collected_messages is not None:
-                new_messages = collected_messages[start_idx:]
-                start_idx = len(collected_messages)
-
-                for new_msg in new_messages:
-                    new_msg.metadata["thread_id"] = thread.id
-                    await thread.on_new_message(new_msg)
-                    if on_intermediate_message:
-                        await on_intermediate_message(new_msg)
-
-            # Now yield the current streamed content (StreamingTextContent)
             message.metadata["thread_id"] = thread.id
             yield AgentResponseItem(message=message, thread=thread)
+
+        for message in collected_messages or []:  # type: ignore
+            message.metadata["thread_id"] = thread.id
+            await thread.on_new_message(message)
+            if on_intermediate_message:
+                await on_intermediate_message(message)
 
     # endregion

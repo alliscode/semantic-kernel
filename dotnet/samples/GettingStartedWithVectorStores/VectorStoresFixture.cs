@@ -1,10 +1,10 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
 using System.Reflection;
-using Azure.AI.OpenAI;
 using Azure.Identity;
-using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
+using Microsoft.SemanticKernel.Connectors.AzureOpenAI;
+using Microsoft.SemanticKernel.Embeddings;
 
 namespace GettingStartedWithVectorStores;
 
@@ -25,13 +25,14 @@ public class VectorStoresFixture
             .Build();
         TestConfiguration.Initialize(configRoot);
 
-        this.EmbeddingGenerator = new AzureOpenAIClient(new Uri(TestConfiguration.AzureOpenAIEmbeddings.Endpoint), new AzureCliCredential())
-            .GetEmbeddingClient(TestConfiguration.AzureOpenAIEmbeddings.DeploymentName)
-            .AsIEmbeddingGenerator();
+        this.TextEmbeddingGenerationService = new AzureOpenAITextEmbeddingGenerationService(
+                TestConfiguration.AzureOpenAIEmbeddings.DeploymentName,
+                TestConfiguration.AzureOpenAIEmbeddings.Endpoint,
+                new AzureCliCredential());
     }
 
     /// <summary>
     /// Gets the text embedding generation service
     /// </summary>
-    public IEmbeddingGenerator<string, Embedding<float>> EmbeddingGenerator { get; }
+    public ITextEmbeddingGenerationService TextEmbeddingGenerationService { get; }
 }

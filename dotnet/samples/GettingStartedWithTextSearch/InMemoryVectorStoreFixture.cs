@@ -1,12 +1,12 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
 using System.Reflection;
-using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.VectorData;
 using Microsoft.SemanticKernel.Connectors.InMemory;
+using Microsoft.SemanticKernel.Connectors.OpenAI;
 using Microsoft.SemanticKernel.Data;
-using OpenAI;
+using Microsoft.SemanticKernel.Embeddings;
 
 namespace GettingStartedWithTextSearch;
 
@@ -15,7 +15,7 @@ namespace GettingStartedWithTextSearch;
 /// </summary>
 public class InMemoryVectorStoreFixture : IAsyncLifetime
 {
-    public IEmbeddingGenerator<string, Embedding<float>> EmbeddingGenerator { get; private set; }
+    public ITextEmbeddingGenerationService TextEmbeddingGenerationService { get; private set; }
 
     public InMemoryVectorStore InMemoryVectorStore { get; private set; }
 
@@ -35,13 +35,13 @@ public class InMemoryVectorStoreFixture : IAsyncLifetime
             .Build();
         TestConfiguration.Initialize(configRoot);
 
-        // Create an embedding generation service.
-        this.EmbeddingGenerator = new OpenAIClient(TestConfiguration.OpenAI.ApiKey)
-            .GetEmbeddingClient(TestConfiguration.OpenAI.EmbeddingModelId)
-            .AsIEmbeddingGenerator();
-
         // Create an InMemory vector store.
-        this.InMemoryVectorStore = new InMemoryVectorStore(new() { EmbeddingGenerator = this.EmbeddingGenerator });
+        this.InMemoryVectorStore = new InMemoryVectorStore();
+
+        // Create an embedding generation service.
+        this.TextEmbeddingGenerationService = new OpenAITextEmbeddingGenerationService(
+                TestConfiguration.OpenAI.EmbeddingModelId,
+                TestConfiguration.OpenAI.ApiKey);
     }
 
     /// <inheritdoc/>
@@ -72,6 +72,7 @@ public class InMemoryVectorStoreFixture : IAsyncLifetime
                 Text = text,
                 Link = $"guid://{guid}",
                 Tag = index % 2 == 0 ? "Even" : "Odd",
+                Embedding = embedding
             };
         }
 
@@ -121,7 +122,7 @@ public class InMemoryVectorStoreFixture : IAsyncLifetime
         // Create records and generate embeddings for them.
         var tasks = entries.Select((entry, i) => Task.Run(async () =>
         {
-            var record = createRecord(i, entry, (await this.EmbeddingGenerator.GenerateAsync(entry).ConfigureAwait(false)).Vector);
+            var record = createRecord(i, entry, await this.TextEmbeddingGenerationService.GenerateEmbeddingAsync(entry).ConfigureAwait(false));
             await collection.UpsertAsync(record).ConfigureAwait(false);
         }));
         await Task.WhenAll(tasks).ConfigureAwait(false);
@@ -154,7 +155,7 @@ public class InMemoryVectorStoreFixture : IAsyncLifetime
         public required string Tag { get; init; }
 
         [VectorStoreRecordVector(1536)]
-        public string Embedding => Text;
+        public ReadOnlyMemory<float> Embedding { get; init; }
     }
     #endregion
 }

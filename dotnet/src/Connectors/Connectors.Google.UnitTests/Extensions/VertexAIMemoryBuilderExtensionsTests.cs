@@ -1,6 +1,5 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
-using System;
 using System.Threading.Tasks;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Memory;
@@ -12,7 +11,6 @@ namespace SemanticKernel.Connectors.Google.UnitTests.Extensions;
 /// <summary>
 /// Unit tests for <see cref="VertexAIMemoryBuilderExtensions"/> class.
 /// </summary>
-[Obsolete("Temporary for Obsolete MemoryBuilder extensions tests.")]
 public sealed class VertexAIMemoryBuilderExtensionsTests
 {
     private readonly Mock<IMemoryStore> _mockMemoryStore = new();

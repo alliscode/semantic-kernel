@@ -52,6 +52,7 @@ internal partial class AzureClientCore : ClientCore
     {
         Verify.NotNullOrWhiteSpace(deploymentName);
         Verify.NotNullOrWhiteSpace(endpoint);
+        Verify.StartsWith(endpoint, "https://", "The Azure OpenAI endpoint must start with 'https://'");
         Verify.NotNullOrWhiteSpace(apiKey);
 
         var options = GetAzureOpenAIClientOptions(httpClient, apiVersion);
@@ -84,6 +85,7 @@ internal partial class AzureClientCore : ClientCore
     {
         Verify.NotNullOrWhiteSpace(deploymentName);
         Verify.NotNullOrWhiteSpace(endpoint);
+        Verify.StartsWith(endpoint, "https://", "The Azure OpenAI endpoint must start with 'https://'");
 
         var options = GetAzureOpenAIClientOptions(httpClient, apiVersion);
 

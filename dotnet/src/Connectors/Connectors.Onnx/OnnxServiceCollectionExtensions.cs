@@ -1,9 +1,7 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
-using System;
 using System.IO;
 using System.Text.Json;
-using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel.ChatCompletion;
@@ -11,6 +9,8 @@ using Microsoft.SemanticKernel.Connectors.Onnx;
 using Microsoft.SemanticKernel.Embeddings;
 
 namespace Microsoft.SemanticKernel;
+
+#pragma warning disable CA2000 // Dispose objects before losing scope
 
 /// <summary>
 /// Provides extension methods for the <see cref="IServiceCollection"/> interface to configure ONNX connectors.
@@ -43,7 +43,6 @@ public static class OnnxServiceCollectionExtensions
         return services;
     }
 
-#pragma warning disable CA2000 // Dispose objects before losing scope
     /// <summary>Adds a text embedding generation service using a BERT ONNX model.</summary>
     /// <param name="services">The <see cref="IServiceCollection"/> instance to augment.</param>
     /// <param name="onnxModelPath">The path to the ONNX model file.</param>
@@ -51,7 +50,6 @@ public static class OnnxServiceCollectionExtensions
     /// <param name="options">Options for the configuration of the model and service.</param>
     /// <param name="serviceId">A local identifier for the given AI service.</param>
     /// <returns>The same instance as <paramref name="services"/>.</returns>
-    [Obsolete("Use AddBertOnnxEmbeddingGenerator instead.")]
     public static IServiceCollection AddBertOnnxTextEmbeddingGeneration(
         this IServiceCollection services,
         string onnxModelPath,
@@ -71,7 +69,6 @@ public static class OnnxServiceCollectionExtensions
     /// <param name="options">Options for the configuration of the model and service.</param>
     /// <param name="serviceId">A local identifier for the given AI service.</param>
     /// <returns>The same instance as <paramref name="services"/>.</returns>
-    [Obsolete("Use AddBertOnnxEmbeddingGenerator instead.")]
     public static IServiceCollection AddBertOnnxTextEmbeddingGeneration(
         this IServiceCollection services,
         Stream onnxModelStream,
@@ -83,5 +80,4 @@ public static class OnnxServiceCollectionExtensions
             serviceId,
             BertOnnxTextEmbeddingGenerationService.Create(onnxModelStream, vocabStream, options));
     }
-#pragma warning restore CA2000 // Dispose objects before losing scope
 }

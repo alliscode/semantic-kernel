@@ -2,7 +2,7 @@
 
 using System.Text.RegularExpressions;
 using Microsoft.SemanticKernel;
-using ModelContextProtocol.Protocol;
+using ModelContextProtocol.Protocol.Types;
 using ModelContextProtocol.Server;
 
 namespace MCPServer.Resources;

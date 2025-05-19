@@ -1,6 +1,5 @@
 # Copyright (c) Microsoft. All rights reserved.
 
-import sys
 from collections.abc import Callable
 from typing import Any
 
@@ -11,13 +10,7 @@ from semantic_kernel.connectors.ai.open_ai.prompt_execution_settings.open_ai_pro
 )
 from semantic_kernel.planners.planner_options import PlannerOptions
 
-if sys.version_info >= (3, 13):
-    from warnings import deprecated
-else:
-    from typing_extensions import deprecated
 
-
-@deprecated("Will be removed in a future version.")
 class FunctionCallingStepwisePlannerOptions(PlannerOptions):
     """The Function Calling Stepwise Planner Options."""
 

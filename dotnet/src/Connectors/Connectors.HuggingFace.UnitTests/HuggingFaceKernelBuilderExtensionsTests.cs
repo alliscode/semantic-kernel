@@ -1,7 +1,5 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
-using System;
-using Microsoft.Extensions.AI;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Connectors.HuggingFace;
 using Microsoft.SemanticKernel.Embeddings;
@@ -27,21 +25,6 @@ public class HuggingFaceKernelBuilderExtensionsTests
     }
 
     [Fact]
-    public void AddHuggingFaceEmbeddingGeneratorCreatesService()
-    {
-        var builder = Kernel.CreateBuilder();
-        builder.AddHuggingFaceEmbeddingGenerator("model");
-
-        var kernel = builder.Build();
-        var service = kernel.GetRequiredService<IEmbeddingGenerator<string, Embedding<float>>>();
-
-        Assert.NotNull(kernel);
-        Assert.NotNull(service);
-        Assert.IsType<HuggingFaceEmbeddingGenerator>(service);
-    }
-
-    [Fact]
-    [Obsolete("This test uses obsolete APIs. Use AddHuggingFaceEmbeddingGeneratorCreatesService instead.")]
     public void AddHuggingFaceTextEmbeddingGenerationCreatesService()
     {
         var builder = Kernel.CreateBuilder();

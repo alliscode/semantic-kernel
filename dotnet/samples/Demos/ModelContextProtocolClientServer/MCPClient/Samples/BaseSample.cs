@@ -9,7 +9,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.SemanticKernel;
 using ModelContextProtocol;
 using ModelContextProtocol.Client;
-using ModelContextProtocol.Protocol;
+using ModelContextProtocol.Protocol.Transport;
+using ModelContextProtocol.Protocol.Types;
 
 namespace MCPClient.Samples;
 

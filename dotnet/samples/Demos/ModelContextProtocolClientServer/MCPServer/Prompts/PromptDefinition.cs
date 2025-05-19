@@ -2,7 +2,7 @@
 
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.PromptTemplates.Handlebars;
-using ModelContextProtocol.Protocol;
+using ModelContextProtocol.Protocol.Types;
 using ModelContextProtocol.Server;
 
 namespace MCPServer.Prompts;

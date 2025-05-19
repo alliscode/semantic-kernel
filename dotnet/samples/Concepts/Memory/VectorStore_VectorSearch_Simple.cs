@@ -1,10 +1,10 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
-using Azure.AI.OpenAI;
 using Azure.Identity;
-using Microsoft.Extensions.AI;
 using Microsoft.Extensions.VectorData;
+using Microsoft.SemanticKernel.Connectors.AzureOpenAI;
 using Microsoft.SemanticKernel.Connectors.InMemory;
+using Microsoft.SemanticKernel.Embeddings;
 
 namespace Memory;
 
@@ -23,9 +23,10 @@ public class VectorStore_VectorSearch_Simple(ITestOutputHelper output) : BaseTes
     public async Task ExampleAsync()
     {
         // Create an embedding generation service.
-        var embeddingGenerator = new AzureOpenAIClient(new Uri(TestConfiguration.AzureOpenAIEmbeddings.Endpoint), new AzureCliCredential())
-            .GetEmbeddingClient(TestConfiguration.AzureOpenAIEmbeddings.DeploymentName)
-            .AsIEmbeddingGenerator();
+        var textEmbeddingGenerationService = new AzureOpenAITextEmbeddingGenerationService(
+                TestConfiguration.AzureOpenAIEmbeddings.DeploymentName,
+                TestConfiguration.AzureOpenAIEmbeddings.Endpoint,
+                new AzureCliCredential());
 
         // Construct an InMemory vector store.
         var vectorStore = new InMemoryVectorStore();
@@ -38,7 +39,7 @@ public class VectorStore_VectorSearch_Simple(ITestOutputHelper output) : BaseTes
         var glossaryEntries = CreateGlossaryEntries().ToList();
         var tasks = glossaryEntries.Select(entry => Task.Run(async () =>
         {
-            entry.DefinitionEmbedding = (await embeddingGenerator.GenerateAsync(entry.Definition)).Vector;
+            entry.DefinitionEmbedding = await textEmbeddingGenerationService.GenerateEmbeddingAsync(entry.Definition);
         }));
         await Task.WhenAll(tasks);
 
@@ -48,7 +49,7 @@ public class VectorStore_VectorSearch_Simple(ITestOutputHelper output) : BaseTes
 
         // Search the collection using a vector search.
         var searchString = "What is an Application Programming Interface";
-        var searchVector = (await embeddingGenerator.GenerateAsync(searchString)).Vector;
+        var searchVector = await textEmbeddingGenerationService.GenerateEmbeddingAsync(searchString);
         var resultRecords = await collection.SearchEmbeddingAsync(searchVector, top: 1).ToListAsync();
 
         Console.WriteLine("Search string: " + searchString);
@@ -57,7 +58,7 @@ public class VectorStore_VectorSearch_Simple(ITestOutputHelper output) : BaseTes
 
         // Search the collection using a vector search.
         searchString = "What is Retrieval Augmented Generation";
-        searchVector = (await embeddingGenerator.GenerateAsync(searchString)).Vector;
+        searchVector = await textEmbeddingGenerationService.GenerateEmbeddingAsync(searchString);
         resultRecords = await collection.SearchEmbeddingAsync(searchVector, top: 1).ToListAsync();
 
         Console.WriteLine("Search string: " + searchString);
@@ -66,7 +67,7 @@ public class VectorStore_VectorSearch_Simple(ITestOutputHelper output) : BaseTes
 
         // Search the collection using a vector search with pre-filtering.
         searchString = "What is Retrieval Augmented Generation";
-        searchVector = (await embeddingGenerator.GenerateAsync(searchString)).Vector;
+        searchVector = await textEmbeddingGenerationService.GenerateEmbeddingAsync(searchString);
         resultRecords = await collection.SearchEmbeddingAsync(searchVector, top: 3, new() { Filter = g => g.Category == "External Definitions" }).ToListAsync();
 
         Console.WriteLine("Search string: " + searchString);

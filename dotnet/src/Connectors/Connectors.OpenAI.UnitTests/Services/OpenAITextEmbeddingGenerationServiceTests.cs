@@ -20,7 +20,6 @@ namespace SemanticKernel.Connectors.OpenAI.UnitTests.Services;
 /// <summary>
 /// Unit tests for <see cref="OpenAITextEmbeddingGenerationService"/> class.
 /// </summary>
-[Obsolete("Temporary tests for obsoleted OpenAITextEmbeddingGenerationService.")]
 public class OpenAITextEmbeddingGenerationServiceTests
 {
     [Fact]

@@ -8,9 +8,7 @@ using Xunit;
 namespace SemanticKernel.Functions.UnitTests.OpenApi.Extensions;
 public sealed class ApiManifestKernelExtensionsTests
 {
-    private const string SkipReason = "Failing intermittently in the integration pipeline with a 429 HTTP status code. To be migrated to the integration tests project.";
-
-    [Fact(Skip = SkipReason)]
+    [Fact]
     public async Task ItCanCreatePluginFromApiManifestAsync()
     {
         // Act
@@ -26,7 +24,7 @@ public sealed class ApiManifestKernelExtensionsTests
         Assert.Equal(3, plugin.FunctionCount);
     }
 
-    [Fact(Skip = SkipReason)]
+    [Fact]
     public async Task ItCanCreatePluginFromApiManifestWithDescriptionParameterAsync()
     {
         // Act
@@ -43,7 +41,7 @@ public sealed class ApiManifestKernelExtensionsTests
         Assert.Equal(description, plugin.Description);
     }
 
-    [Fact(Skip = SkipReason)]
+    [Fact]
     public async Task ItCanCreatePluginFromApiManifestWithEmptyDescriptionParameterAsync()
     {
         // Act
@@ -59,7 +57,7 @@ public sealed class ApiManifestKernelExtensionsTests
         Assert.Empty(plugin.Description);
     }
 
-    [Fact(Skip = SkipReason)]
+    [Fact]
     public async Task ItCanImportPluginFromApiManifestAsync()
     {
         // Act
@@ -76,7 +74,7 @@ public sealed class ApiManifestKernelExtensionsTests
         Assert.Single(kernel.Plugins);
     }
 
-    [Fact(Skip = SkipReason)]
+    [Fact]
     public async Task ItCanImportPluginFromApiManifestWithDescriptionParameterAsync()
     {
         // Act
@@ -93,7 +91,7 @@ public sealed class ApiManifestKernelExtensionsTests
         Assert.Equal(description, plugin.Description);
     }
 
-    [Fact(Skip = SkipReason)]
+    [Fact]
     public async Task ItCanImportPluginFromApiManifestWithLocalAndRemoteApiDescriptionUrlAsync()
     {
         // Act
@@ -109,7 +107,7 @@ public sealed class ApiManifestKernelExtensionsTests
         Assert.Equal(2, plugin.FunctionCount);
     }
 
-    [Fact(Skip = SkipReason)]
+    [Fact]
     // Verify that functions are correctly imported
     public async Task VerifyPluginFunctionsFromApiManifestAsync()
     {

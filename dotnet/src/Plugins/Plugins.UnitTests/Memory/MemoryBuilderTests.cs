@@ -1,6 +1,5 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
-using System;
 using System.Net.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
@@ -44,7 +43,6 @@ public sealed class MemoryBuilderTests
     }
 
     [Fact]
-    [Obsolete("Temporary test for obsolete ITextEmbeddingGenerationService MemoryBuilder extensions.")]
     public void ItInitializesMemoryWhenRequiredDependenciesAreProvided()
     {
         // Arrange
@@ -60,7 +58,6 @@ public sealed class MemoryBuilderTests
     }
 
     [Fact]
-    [Obsolete("Temporary test for obsolete ITextEmbeddingGenerationService MemoryBuilder extensions.")]
     public void ItUsesProvidedLoggerFactory()
     {
         // Arrange
@@ -88,7 +85,6 @@ public sealed class MemoryBuilderTests
     }
 
     [Fact]
-    [Obsolete("Temporary test for obsolete ITextEmbeddingGenerationService MemoryBuilder extensions.")]
     public void ItUsesProvidedHttpClientFactory()
     {
         // Arrange

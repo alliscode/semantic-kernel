@@ -143,12 +143,10 @@ internal sealed class KernelRequestTracer : IDisposable
     {
         this.DisposeHttpResources();
         this._memoryDummyResponse = new MemoryStream(Encoding.UTF8.GetBytes(DummyResponse));
-        this._httpMessageHandlerStub = new HttpMessageHandlerStub
+        this._httpMessageHandlerStub = new HttpMessageHandlerStub();
+        this._httpMessageHandlerStub.ResponseToReturn = new HttpResponseMessage(HttpStatusCode.OK)
         {
-            ResponseToReturn = new HttpResponseMessage(HttpStatusCode.OK)
-            {
-                Content = new StreamContent(this._memoryDummyResponse)
-            }
+            Content = new StreamContent(this._memoryDummyResponse)
         };
         this._httpClient = new HttpClient(this._httpMessageHandlerStub);
     }

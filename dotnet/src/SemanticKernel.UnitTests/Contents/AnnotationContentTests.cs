@@ -1,5 +1,4 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
-using System;
 using Microsoft.SemanticKernel.Agents;
 using Xunit;
 
@@ -18,8 +17,12 @@ public class AnnotationContentTests
     [Fact]
     public void VerifyAnnotationContentInitialState()
     {
-        Assert.Throws<ArgumentException>(() => new AnnotationContent(AnnotationKind.FileCitation, string.Empty, "test"));
-        Assert.Throws<ArgumentException>(() => new AnnotationContent(AnnotationKind.FileCitation, "test", string.Empty));
+        AnnotationContent definition = new();
+
+        Assert.Empty(definition.Quote);
+        Assert.Equal(0, definition.StartIndex);
+        Assert.Equal(0, definition.EndIndex);
+        Assert.Null(definition.FileId);
     }
     /// <summary>
     /// Verify usage.
@@ -28,16 +31,17 @@ public class AnnotationContentTests
     public void VerifyAnnotationContentUsage()
     {
         AnnotationContent definition =
-            new(AnnotationKind.TextCitation, "test label", "#id")
+            new()
             {
+                Quote = "test quote",
                 StartIndex = 33,
                 EndIndex = 49,
+                FileId = "#id",
             };
 
-        Assert.Equal(AnnotationKind.TextCitation, definition.Kind);
-        Assert.Equal("test label", definition.Label);
+        Assert.Equal("test quote", definition.Quote);
         Assert.Equal(33, definition.StartIndex);
         Assert.Equal(49, definition.EndIndex);
-        Assert.Equal("#id", definition.ReferenceId);
+        Assert.Equal("#id", definition.FileId);
     }
 }

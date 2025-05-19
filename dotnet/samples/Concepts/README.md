@@ -36,7 +36,6 @@ dotnet test -l "console;verbosity=detailed" --filter "FullyQualifiedName=ChatCom
 - [AzureAIInference_FunctionCalling](https://github.com/microsoft/semantic-kernel/blob/main/dotnet/samples/Concepts/FunctionCalling/AzureAIInference_FunctionCalling.cs)
 - [NexusRaven_HuggingFaceTextGeneration](https://github.com/microsoft/semantic-kernel/blob/main/dotnet/samples/Concepts/FunctionCalling/NexusRaven_FunctionCalling.cs)
 - [MultipleFunctionsVsParameters](https://github.com/microsoft/semantic-kernel/blob/main/dotnet/samples/Concepts/FunctionCalling/MultipleFunctionsVsParameters.cs)
-- [FunctionCalling_SharedState](https://github.com/microsoft/semantic-kernel/blob/main/dotnet/samples/Concepts/FunctionCalling/FunctionCalling_SharedState.cs)
 
 ### Caching - Examples of caching implementations
 
@@ -129,7 +128,6 @@ dotnet test -l "console;verbosity=detailed" --filter "FullyQualifiedName=ChatCom
 
 ### Memory - Using AI [`Memory`](https://github.com/microsoft/semantic-kernel/tree/main/dotnet/src/SemanticKernel.Abstractions/Memory) concepts
 
-- [AWSBedrock_EmbeddingGeneration](https://github.com/microsoft/semantic-kernel/blob/main/dotnet/samples/Concepts/Memory/AWSBedrock_EmbeddingGeneration.cs)
 - [OpenAI_EmbeddingGeneration](https://github.com/microsoft/semantic-kernel/blob/main/dotnet/samples/Concepts/Memory/OpenAI_EmbeddingGeneration.cs)
 - [Ollama_EmbeddingGeneration](https://github.com/microsoft/semantic-kernel/blob/main/dotnet/samples/Concepts/Memory/Ollama_EmbeddingGeneration.cs)
 - [Onnx_EmbeddingGeneration](https://github.com/microsoft/semantic-kernel/blob/main/dotnet/samples/Concepts/Memory/Onnx_EmbeddingGeneration.cs)
@@ -170,7 +168,6 @@ dotnet test -l "console;verbosity=detailed" --filter "FullyQualifiedName=ChatCom
 - [CreatePluginFromOpenApiSpec_Jira](https://github.com/microsoft/semantic-kernel/blob/main/dotnet/samples/Concepts/Plugins/CreatePluginFromOpenApiSpec_Jira.cs)
 - [CreatePluginFromOpenApiSpec_Klarna](https://github.com/microsoft/semantic-kernel/blob/main/dotnet/samples/Concepts/Plugins/CreatePluginFromOpenApiSpec_Klarna.cs)
 - [CreatePluginFromOpenApiSpec_RepairService](https://github.com/microsoft/semantic-kernel/blob/main/dotnet/samples/Concepts/Plugins/CreatePluginFromOpenApiSpec_RepairService.cs)
-- [CreatePromptPluginFromDirectory](https://github.com/microsoft/semantic-kernel/blob/main/dotnet/samples/Concepts/Plugins/CreatePromptPluginFromDirectory.cs)
 - [CrewAI_Plugin](https://github.com/microsoft/semantic-kernel/blob/main/dotnet/samples/Concepts/Plugins/CrewAI_Plugin.cs)
 - [OpenApiPlugin_PayloadHandling](https://github.com/microsoft/semantic-kernel/blob/main/dotnet/samples/Concepts/Plugins/OpenApiPlugin_PayloadHandling.cs)
 - [OpenApiPlugin_CustomHttpContentReader](https://github.com/microsoft/semantic-kernel/blob/main/dotnet/samples/Concepts/Plugins/OpenApiPlugin_CustomHttpContentReader.cs)

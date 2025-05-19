@@ -1,6 +1,5 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
-using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
@@ -12,24 +11,23 @@ namespace SemanticKernel.IntegrationTests.Connectors.MistralAI;
 /// <summary>
 /// Integration tests for <see cref="MistralAITextEmbeddingGenerationService"/>.
 /// </summary>
-[Obsolete("Temporary Tests for Obsolete MistralAITextEmbeddingGenerationService")]
-public sealed class MistralAITextEmbeddingGenerationServiceTests
+public sealed class MistralAITextEmbeddingTests
 {
     private readonly IConfigurationRoot _configuration;
 
-    public MistralAITextEmbeddingGenerationServiceTests()
+    public MistralAITextEmbeddingTests()
     {
         // Load configuration
         this._configuration = new ConfigurationBuilder()
             .AddJsonFile(path: "testsettings.json", optional: false, reloadOnChange: true)
             .AddJsonFile(path: "testsettings.development.json", optional: true, reloadOnChange: true)
             .AddEnvironmentVariables()
-            .AddUserSecrets<MistralAITextEmbeddingGenerationServiceTests>()
+            .AddUserSecrets<MistralAITextEmbeddingTests>()
             .Build();
     }
 
     [Fact(Skip = "This test is for manual verification.")]
-    public async Task MistralAITextGenerateEmbeddingsAsync()
+    public async Task MistralAIGenerateEmbeddingsAsync()
     {
         // Arrange
         var model = this._configuration["MistralAI:EmbeddingModel"];
@@ -45,24 +43,5 @@ public sealed class MistralAITextEmbeddingGenerationServiceTests
         Assert.Equal(2, response.Count);
         Assert.Equal(1024, response[0].Length);
         Assert.Equal(1024, response[1].Length);
-    }
-
-    [Fact(Skip = "This test is for manual verification.")]
-    public async Task MistralAIEmbeddingGeneratorAsync()
-    {
-        // Arrange
-        var model = this._configuration["MistralAI:EmbeddingModel"];
-        var apiKey = this._configuration["MistralAI:ApiKey"];
-        using var service = new MistralAIEmbeddingGenerator(model!, apiKey!);
-
-        // Act
-        List<string> data = ["Hello", "world"];
-        var response = (await service.GenerateAsync(data));
-
-        // Assert
-        Assert.NotNull(response);
-        Assert.Equal(2, response.Count);
-        Assert.Equal(1024, response[0].Vector.Length);
-        Assert.Equal(1024, response[1].Vector.Length);
     }
 }

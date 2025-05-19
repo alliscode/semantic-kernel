@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Agents;
 using Microsoft.SemanticKernel.Agents.Bedrock;
+using Microsoft.SemanticKernel.ChatCompletion;
 
 namespace GettingStarted.BedrockAgents;
 
@@ -197,7 +198,7 @@ public class Step07_BedrockAgent_Declarative : BaseBedrockAgentTest
         AgentThread? agentThread = null;
         try
         {
-            await foreach (AgentResponseItem<ChatMessageContent> response in agent.InvokeAsync(input))
+            await foreach (AgentResponseItem<ChatMessageContent> response in agent.InvokeAsync(new ChatMessageContent(AuthorRole.User, input)))
             {
                 agentThread = response.Thread;
                 WriteAgentChatMessage(response);

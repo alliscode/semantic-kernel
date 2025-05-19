@@ -18,7 +18,6 @@ namespace Microsoft.SemanticKernel.Connectors.AzureOpenAI;
 /// Azure OpenAI text embedding service.
 /// </summary>
 [Experimental("SKEXP0010")]
-[Obsolete("Use AzureOpenAIEmbeddingGenerator instead.")]
 public sealed class AzureOpenAITextEmbeddingGenerationService : ITextEmbeddingGenerationService
 {
     private readonly AzureClientCore _client;

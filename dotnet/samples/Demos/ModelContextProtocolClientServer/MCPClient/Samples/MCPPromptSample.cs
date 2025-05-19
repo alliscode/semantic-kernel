@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using ModelContextProtocol.Client;
-using ModelContextProtocol.Protocol;
+using ModelContextProtocol.Protocol.Types;
 
 namespace MCPClient.Samples;
 

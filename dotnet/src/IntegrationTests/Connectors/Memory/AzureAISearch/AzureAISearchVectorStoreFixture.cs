@@ -6,15 +6,15 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Azure;
-using Azure.AI.OpenAI;
 using Azure.Identity;
 using Azure.Search.Documents;
 using Azure.Search.Documents.Indexes;
 using Azure.Search.Documents.Indexes.Models;
 using Azure.Search.Documents.Models;
-using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.VectorData;
+using Microsoft.SemanticKernel.Connectors.AzureOpenAI;
+using Microsoft.SemanticKernel.Embeddings;
 using SemanticKernel.IntegrationTests.TestSettings;
 using SemanticKernel.IntegrationTests.TestSettings.Memory;
 using Xunit;
@@ -83,10 +83,10 @@ public class AzureAISearchVectorStoreFixture : IAsyncLifetime
         Assert.NotNull(embeddingsConfig);
         Assert.NotEmpty(embeddingsConfig.DeploymentName);
         Assert.NotEmpty(embeddingsConfig.Endpoint);
-
-        this.EmbeddingGenerator = new AzureOpenAIClient(new Uri(embeddingsConfig.Endpoint), new AzureCliCredential())
-            .GetEmbeddingClient(embeddingsConfig.DeploymentName)
-            .AsIEmbeddingGenerator();
+        this.EmbeddingGenerator = new AzureOpenAITextEmbeddingGenerationService(
+            deploymentName: embeddingsConfig.DeploymentName,
+            endpoint: embeddingsConfig.Endpoint,
+            credential: new AzureCliCredential());
     }
 
     /// <summary>
@@ -112,7 +112,7 @@ public class AzureAISearchVectorStoreFixture : IAsyncLifetime
     /// <summary>
     /// Gets the embedding generator to use for generating embeddings for text.
     /// </summary>
-    public IEmbeddingGenerator<string, Embedding<float>> EmbeddingGenerator { get; private set; }
+    public ITextEmbeddingGenerationService EmbeddingGenerator { get; private set; }
 
     /// <summary>
     /// Gets the embedding used for all test documents that the collection is seeded with.
@@ -172,10 +172,8 @@ public class AzureAISearchVectorStoreFixture : IAsyncLifetime
         searchFields.Add(new VectorSearchField("DescriptionEmbedding", 1536, "my-vector-profile"));
 
         // Create an index definition with a vectorizer to use when doing vector searches using text.
-        var definition = new SearchIndex(indexName, searchFields)
-        {
-            VectorSearch = new VectorSearch()
-        };
+        var definition = new SearchIndex(indexName, searchFields);
+        definition.VectorSearch = new VectorSearch();
         definition.VectorSearch.Vectorizers.Add(new AzureOpenAIVectorizer("text-embedding-vectorizer")
         {
             Parameters = new AzureOpenAIVectorizerParameters
@@ -199,10 +197,10 @@ public class AzureAISearchVectorStoreFixture : IAsyncLifetime
     /// Upload test documents to the index.
     /// </summary>
     /// <param name="searchClient">The client to use for uploading the documents.</param>
-    /// <param name="embeddingGenerator">An instance of <see cref="IEmbeddingGenerator"/> to generate embeddings.</param>
-    public async Task UploadDocumentsAsync(SearchClient searchClient, IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator)
+    /// <param name="embeddingGenerator">An instance of <see cref="ITextEmbeddingGenerationService"/> to generate embeddings.</param>
+    public async Task UploadDocumentsAsync(SearchClient searchClient, ITextEmbeddingGenerationService embeddingGenerator)
     {
-        this.Embedding = (await embeddingGenerator.GenerateAsync("This is a great hotel")).Vector;
+        this.Embedding = await embeddingGenerator.GenerateEmbeddingAsync("This is a great hotel");
 
         IndexDocumentsBatch<AzureAISearchHotel> batch = IndexDocumentsBatch.Create(
             IndexDocumentsAction.Upload(

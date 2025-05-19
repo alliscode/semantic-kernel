@@ -15,12 +15,12 @@ namespace Microsoft.SemanticKernel.Connectors.Google.Core;
 internal sealed class GeminiRequest
 {
     private static JsonSerializerOptions? s_options;
-    private static readonly AIJsonSchemaCreateOptions s_schemaConfiguration = new()
+    private static readonly AIJsonSchemaCreateOptions s_schemaOptions = new()
     {
-        TransformOptions = new()
-        {
-            UseNullableKeyword = true,
-        }
+        IncludeSchemaKeyword = false,
+        IncludeTypeInEnumSchemas = true,
+        RequireAllProperties = false,
+        DisallowAdditionalProperties = false,
     };
 
     [JsonPropertyName("contents")]
@@ -319,11 +319,11 @@ internal sealed class GeminiRequest
         var jsonElement = responseSchemaSettings switch
         {
             JsonElement element => element,
-            Type type => CreateSchema(type, GetDefaultOptions(), configuration: s_schemaConfiguration),
+            Type type => CreateSchema(type, GetDefaultOptions()),
             KernelJsonSchema kernelJsonSchema => kernelJsonSchema.RootElement,
             JsonNode jsonNode => JsonSerializer.SerializeToElement(jsonNode, GetDefaultOptions()),
             JsonDocument jsonDocument => JsonSerializer.SerializeToElement(jsonDocument, GetDefaultOptions()),
-            _ => CreateSchema(responseSchemaSettings.GetType(), GetDefaultOptions(), configuration: s_schemaConfiguration)
+            _ => CreateSchema(responseSchemaSettings.GetType(), GetDefaultOptions())
         };
 
         jsonElement = TransformToOpenApi3Schema(jsonElement);
@@ -401,7 +401,7 @@ internal sealed class GeminiRequest
         string? description = null,
         AIJsonSchemaCreateOptions? configuration = null)
     {
-        configuration ??= s_schemaConfiguration;
+        configuration ??= s_schemaOptions;
         return AIJsonUtilities.CreateJsonSchema(type, description, serializerOptions: options, inferenceOptions: configuration);
     }
 

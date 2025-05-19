@@ -1,5 +1,6 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
+using System.Collections.Generic;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
 
@@ -36,6 +37,12 @@ public sealed class KernelProcessEdge
     public KernelProcessEdgeCondition Condition { get; init; }
 
     /// <summary>
+    /// Optional metadata to include with the edge.
+    /// </summary>
+    [DataMember]
+    public Dictionary<string, object?> Metadata { get; init; }
+
+    /// <summary>
     /// The list of variable updates to be performed when the edge fires.
     /// </summary>
     public VariableUpdate? Update { get; init; }
@@ -43,7 +50,7 @@ public sealed class KernelProcessEdge
     /// <summary>
     /// Creates a new instance of the <see cref="KernelProcessEdge"/> class.
     /// </summary>
-    public KernelProcessEdge(string sourceStepId, KernelProcessTarget outputTarget, string? groupId = null, KernelProcessEdgeCondition? condition = null, /*Dictionary<string, object?>? metadata = null,*/ VariableUpdate? update = null)
+    public KernelProcessEdge(string sourceStepId, KernelProcessTarget outputTarget, string? groupId = null, KernelProcessEdgeCondition? condition = null, Dictionary<string, object?>? metadata = null, VariableUpdate? update = null)
     {
         Verify.NotNullOrWhiteSpace(sourceStepId);
         Verify.NotNull(outputTarget);
@@ -52,7 +59,7 @@ public sealed class KernelProcessEdge
         this.OutputTarget = outputTarget;
         this.GroupId = groupId;
         this.Condition = condition ?? new KernelProcessEdgeCondition(callback: (_, _) => Task.FromResult(true));
-        //this.Metadata = metadata ?? [];
+        this.Metadata = metadata ?? [];
         this.Update = update;
     }
 }

@@ -19,22 +19,16 @@ namespace SemanticKernel.UnitTests.AI;
 public class ServiceConversionExtensionsTests
 {
     [Fact]
-    [Obsolete("Temporary test for Obsolete ITextEmbeddingGenerationService")]
-    public void EmbeddingGenerationInvalidArgumentsThrow()
+    public void InvalidArgumentsThrow()
     {
         Assert.Throws<ArgumentNullException>("service", () => EmbeddingGenerationExtensions.AsEmbeddingGenerator<string, float>(null!));
         Assert.Throws<ArgumentNullException>("generator", () => EmbeddingGenerationExtensions.AsEmbeddingGenerationService<string, float>(null!));
-    }
 
-    [Fact]
-    public void ChatCompletionInvalidArgumentsThrow()
-    {
         Assert.Throws<ArgumentNullException>("service", () => ChatCompletionServiceExtensions.AsChatClient(null!));
         Assert.Throws<ArgumentNullException>("client", () => ChatCompletionServiceExtensions.AsChatCompletionService(null!));
     }
 
     [Fact]
-    [Obsolete("Temporary test for Obsolete ITextEmbeddingGenerationService")]
     public void AsEmbeddingGeneratorMetadataReturnsExpectedData()
     {
         IEmbeddingGenerator<string, Embedding<float>> generator = new TestEmbeddingGenerationService()
@@ -54,7 +48,6 @@ public class ServiceConversionExtensionsTests
     }
 
     [Fact]
-    [Obsolete("Temporary test for Obsolete ITextEmbeddingGenerationService")]
     public void AsEmbeddingGenerationServiceReturnsExpectedAttributes()
     {
         using var generator = new TestEmbeddingGenerator()
@@ -104,7 +97,6 @@ public class ServiceConversionExtensionsTests
     }
 
     [Fact]
-    [Obsolete("Temporary test for Obsolete ITextEmbeddingGenerationService")]
     public async Task AsEmbeddingGeneratorConvertedAsExpected()
     {
         IEmbeddingGenerator<string, Embedding<float>> generator = new TestEmbeddingGenerationService()
@@ -123,7 +115,6 @@ public class ServiceConversionExtensionsTests
     }
 
     [Fact]
-    [Obsolete("Temporary test for Obsolete ITextEmbeddingGenerationService")]
     public async Task AsEmbeddingGenerationServiceConvertedAsExpected()
     {
         using IEmbeddingGenerator<string, Embedding<float>> generator = new TestEmbeddingGenerator()
@@ -697,7 +688,6 @@ public class ServiceConversionExtensionsTests
         }
     }
 
-    [Obsolete("Temporary test for Obsolete ITextEmbeddingGenerationService")]
     private sealed class TestEmbeddingGenerationService : IEmbeddingGenerationService<string, float>
     {
         public IReadOnlyDictionary<string, object?> Attributes { get; set; } = new Dictionary<string, object?>();

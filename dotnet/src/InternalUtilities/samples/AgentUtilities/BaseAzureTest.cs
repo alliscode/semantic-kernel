@@ -32,7 +32,7 @@ public abstract class BaseAzureAgentTest : BaseAgentsTest<AIProjectClient>
         {
             if (item is AnnotationContent annotation)
             {
-                await this.DownloadFileAsync(annotation.ReferenceId!);
+                await this.DownloadFileAsync(annotation.FileId!);
             }
         }
     }

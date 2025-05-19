@@ -168,10 +168,8 @@ public sealed class AzureAISearchVectorStoreRecordCollection<TKey, TRecord> :
         }
 
         // Create the index.
-        var searchIndex = new SearchIndex(this._collectionName, searchFields)
-        {
-            VectorSearch = vectorSearchConfig
-        };
+        var searchIndex = new SearchIndex(this._collectionName, searchFields);
+        searchIndex.VectorSearch = vectorSearchConfig;
 
         return this.RunOperationAsync(
             "CreateIndex",

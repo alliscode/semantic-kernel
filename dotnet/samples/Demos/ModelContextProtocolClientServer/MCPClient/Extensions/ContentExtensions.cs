@@ -2,7 +2,7 @@
 
 using System;
 using Microsoft.SemanticKernel;
-using ModelContextProtocol.Protocol;
+using ModelContextProtocol.Protocol.Types;
 
 namespace MCPClient;
 

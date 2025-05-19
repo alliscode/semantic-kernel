@@ -24,7 +24,7 @@ namespace Microsoft.SemanticKernel;
 /// <summary>
 /// Provides extension methods for <see cref="IServiceCollection"/> to configure Azure OpenAI connectors.
 /// </summary>
-public static partial class AzureOpenAIServiceCollectionExtensions
+public static class AzureOpenAIServiceCollectionExtensions
 {
     #region Chat Completion
 
@@ -160,7 +160,6 @@ public static partial class AzureOpenAIServiceCollectionExtensions
     /// <param name="httpClient">The HttpClient to use with this service.</param>
     /// <returns>The same instance as <paramref name="services"/>.</returns>
     [Experimental("SKEXP0010")]
-    [Obsolete("Use AddAzureOpenAIEmbeddingGenerator instead.")]
     public static IServiceCollection AddAzureOpenAITextEmbeddingGeneration(
         this IServiceCollection services,
         string deploymentName,
@@ -200,7 +199,6 @@ public static partial class AzureOpenAIServiceCollectionExtensions
     /// <param name="httpClient">The HttpClient to use with this service.</param>
     /// <returns>The same instance as <paramref name="services"/>.</returns>
     [Experimental("SKEXP0010")]
-    [Obsolete("Use AddAzureOpenAIEmbeddingGenerator instead.")]
     public static IServiceCollection AddAzureOpenAITextEmbeddingGeneration(
         this IServiceCollection services,
         string deploymentName,
@@ -238,7 +236,6 @@ public static partial class AzureOpenAIServiceCollectionExtensions
     /// <param name="dimensions">The number of dimensions the resulting output embeddings should have. Only supported in "text-embedding-3" and later models.</param>
     /// <returns>The same instance as <paramref name="services"/>.</returns>
     [Experimental("SKEXP0010")]
-    [Obsolete("Use AddAzureOpenAIEmbeddingGenerator instead.")]
     public static IServiceCollection AddAzureOpenAITextEmbeddingGeneration(
         this IServiceCollection services,
         string deploymentName,

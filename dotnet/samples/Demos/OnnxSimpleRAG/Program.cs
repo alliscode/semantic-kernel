@@ -3,7 +3,6 @@
 using System;
 using System.IO;
 using System.Linq;
-using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.VectorData;
 using Microsoft.ML.OnnxRuntimeGenAI;
@@ -12,6 +11,7 @@ using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Connectors.InMemory;
 using Microsoft.SemanticKernel.Connectors.Onnx;
 using Microsoft.SemanticKernel.Data;
+using Microsoft.SemanticKernel.Embeddings;
 using Microsoft.SemanticKernel.PromptTemplates.Handlebars;
 
 Console.OutputEncoding = System.Text.Encoding.UTF8;
@@ -36,17 +36,17 @@ using var ogaHandle = new OgaHandle();
 // Load the services
 var builder = Kernel.CreateBuilder()
     .AddOnnxRuntimeGenAIChatCompletion(chatModelId, chatModelPath)
-    .AddBertOnnxEmbeddingGenerator(embeddingModelPath, embeddingVocabPath);
+    .AddBertOnnxTextEmbeddingGeneration(embeddingModelPath, embeddingVocabPath);
 
 // Build Kernel
 var kernel = builder.Build();
 
 // Get the instances of the services
 using var chatService = kernel.GetRequiredService<IChatCompletionService>() as OnnxRuntimeGenAIChatCompletionService;
-var embeddingService = kernel.GetRequiredService<IEmbeddingGenerator<string, Embedding<float>>>();
+var embeddingService = kernel.GetRequiredService<ITextEmbeddingGenerationService>();
 
 // Create a vector store and a collection to store information
-var vectorStore = new InMemoryVectorStore(new() { EmbeddingGenerator = embeddingService });
+var vectorStore = new InMemoryVectorStore();
 var collection = vectorStore.GetCollection<string, InformationItem>("ExampleCollection");
 await collection.CreateCollectionIfNotExistsAsync();
 
@@ -58,12 +58,16 @@ foreach (var factTextFile in Directory.GetFiles("Facts", "*.txt"))
     await collection.UpsertAsync(new InformationItem()
     {
         Id = Guid.NewGuid().ToString(),
-        Text = factContent
+        Text = factContent,
+        Embedding = await embeddingService.GenerateEmbeddingAsync(factContent)
     });
 }
 
 // Add a plugin to search the database with.
-var vectorStoreTextSearch = new VectorStoreTextSearch<InformationItem>(collection);
+// TODO: Once OpenAITextEmbeddingGenerationService implements MEAI's IEmbeddingGenerator (#10811), configure it with the InMemoryVectorStore above instead of passing it here.
+#pragma warning disable CS0618 // VectorStoreTextSearch with ITextEmbeddingGenerationService is obsolete
+var vectorStoreTextSearch = new VectorStoreTextSearch<InformationItem>(collection, embeddingService);
+#pragma warning restore CS0618
 kernel.Plugins.Add(vectorStoreTextSearch.CreateWithSearch("SearchPlugin"));
 
 // Start the conversation
@@ -135,5 +139,5 @@ internal sealed class InformationItem
     public string Text { get; set; } = string.Empty;
 
     [VectorStoreRecordVector(Dimensions: 384)]
-    public string Embedding => this.Text;
+    public ReadOnlyMemory<float> Embedding { get; set; }
 }

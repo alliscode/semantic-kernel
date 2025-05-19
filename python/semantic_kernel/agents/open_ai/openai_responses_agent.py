@@ -20,8 +20,10 @@ from openai.types.shared_params.compound_filter import CompoundFilter
 from openai.types.shared_params.response_format_json_object import ResponseFormatJSONObject
 from pydantic import BaseModel, Field, ValidationError
 
-from semantic_kernel.agents import Agent, AgentResponseItem, AgentThread, RunPollingOptions
+from semantic_kernel.agents import Agent
+from semantic_kernel.agents.agent import AgentResponseItem, AgentThread
 from semantic_kernel.agents.open_ai.responses_agent_thread_actions import ResponsesAgentThreadActions
+from semantic_kernel.agents.open_ai.run_polling_options import RunPollingOptions
 from semantic_kernel.connectors.ai.function_choice_behavior import FunctionChoiceBehavior
 from semantic_kernel.connectors.ai.open_ai.settings.open_ai_settings import OpenAISettings
 from semantic_kernel.contents.chat_history import ChatHistory
@@ -762,7 +764,7 @@ class OpenAIResponsesAgent(Agent):
         function_choice_behavior = function_choice_behavior or self.function_choice_behavior
         assert function_choice_behavior is not None  # nosec
 
-        async for is_visible, message in ResponsesAgentThreadActions.invoke(
+        async for is_visible, response in ResponsesAgentThreadActions.invoke(
             agent=self,
             chat_history=chat_history,
             thread=thread,
@@ -772,15 +774,13 @@ class OpenAIResponsesAgent(Agent):
             function_choice_behavior=function_choice_behavior,
             **response_level_params,  # type: ignore
         ):
-            message.metadata["thread_id"] = thread.id
-            await thread.on_new_message(message)
+            response.metadata["thread_id"] = thread.id
+            await thread.on_new_message(response)
+            if on_intermediate_message:
+                await on_intermediate_message(response)
 
             if is_visible:
-                # Only yield visible messages
-                yield AgentResponseItem(message=message, thread=thread)
-            elif on_intermediate_message:
-                # Emit tool-related messages only via callback
-                await on_intermediate_message(message)
+                yield AgentResponseItem(message=response, thread=thread)
 
     @trace_agent_invocation
     @override
@@ -880,8 +880,7 @@ class OpenAIResponsesAgent(Agent):
 
         collected_messages: list[ChatMessageContent] | None = [] if on_intermediate_message else None
 
-        start_idx = 0
-        async for message in ResponsesAgentThreadActions.invoke_stream(
+        async for response in ResponsesAgentThreadActions.invoke_stream(
             agent=self,
             chat_history=chat_history,
             thread=thread,
@@ -892,20 +891,14 @@ class OpenAIResponsesAgent(Agent):
             function_choice_behavior=function_choice_behavior,
             **response_level_params,  # type: ignore
         ):
-            # Before yielding the current streamed message, emit any new full messages first
-            if collected_messages is not None:
-                new_messages = collected_messages[start_idx:]
-                start_idx = len(collected_messages)
+            response.metadata["thread_id"] = thread.id
+            yield AgentResponseItem(message=response, thread=thread)
 
-                for new_msg in new_messages:
-                    new_msg.metadata["thread_id"] = thread.id
-                    await thread.on_new_message(new_msg)
-                    if on_intermediate_message:
-                        await on_intermediate_message(new_msg)
-
-            # Now yield the current streamed content (StreamingTextContent)
+        for message in collected_messages or []:
             message.metadata["thread_id"] = thread.id
-            yield AgentResponseItem(message=message, thread=thread)
+            await thread.on_new_message(message)
+            if on_intermediate_message:
+                await on_intermediate_message(message)
 
     def _prepare_input_message(
         self,

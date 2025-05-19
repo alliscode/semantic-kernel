@@ -2,11 +2,10 @@
 
 using System;
 using System.Threading.Tasks;
-using Azure.AI.OpenAI;
 using Azure.Identity;
-using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.SemanticKernel.Connectors.AzureAISearch;
+using Microsoft.SemanticKernel.Connectors.AzureOpenAI;
 using Microsoft.SemanticKernel.Data;
 using SemanticKernel.IntegrationTests.Data;
 using SemanticKernel.IntegrationTests.TestSettings;
@@ -74,12 +73,12 @@ public class AzureAISearchTextSearchTests(AzureAISearchVectorStoreFixture fixtur
             Assert.NotNull(azureOpenAIConfiguration);
             Assert.NotEmpty(azureOpenAIConfiguration.DeploymentName);
             Assert.NotEmpty(azureOpenAIConfiguration.Endpoint);
+            this.EmbeddingGenerator = new AzureOpenAITextEmbeddingGenerationService(
+                azureOpenAIConfiguration.DeploymentName,
+                azureOpenAIConfiguration.Endpoint,
+                new AzureCliCredential());
 
-            this.EmbeddingGenerator = new AzureOpenAIClient(new Uri(azureOpenAIConfiguration.Endpoint), new AzureCliCredential())
-                .GetEmbeddingClient(azureOpenAIConfiguration.DeploymentName)
-                .AsIEmbeddingGenerator();
-
-            this.VectorStore = new AzureAISearchVectorStore(fixture.SearchIndexClient, new() { EmbeddingGenerator = this.EmbeddingGenerator });
+            this.VectorStore = new AzureAISearchVectorStore(fixture.SearchIndexClient);
         }
 
         var vectorSearch = this.VectorStore.GetCollection<string, AzureAISearchHotel>(fixture.TestIndexName);
@@ -87,7 +86,9 @@ public class AzureAISearchTextSearchTests(AzureAISearchVectorStoreFixture fixtur
         var resultMapper = new HotelTextSearchResultMapper();
 
         // TODO: Once OpenAITextEmbeddingGenerationService implements MEAI's IEmbeddingGenerator (#10811), configure it with the AzureAISearchVectorStore above instead of passing it here.
+#pragma warning disable CS0618 // VectorStoreTextSearch with ITextEmbeddingGenerationService is obsolete
         var result = new VectorStoreTextSearch<AzureAISearchHotel>(vectorSearch, this.EmbeddingGenerator!, stringMapper, resultMapper);
+#pragma warning restore CS0618
 
         return Task.FromResult<ITextSearch>(result);
     }
