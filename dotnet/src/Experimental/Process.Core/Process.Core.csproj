@@ -34,6 +34,8 @@
   <ItemGroup>
     <PackageReference Include="JmesPath.Net" />
     <PackageReference Include="JsonSchema.Net.Generation" />
+    <PackageReference Include="Microsoft.Bot.ObjectModel" />
+    <PackageReference Include="Microsoft.PowerFx.Interpreter" />
     <PackageReference Include="System.Net.Http" />
     <PackageReference Include="System.Text.RegularExpressions" />
   </ItemGroup>

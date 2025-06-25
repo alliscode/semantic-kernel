@@ -1,6 +1,7 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
 using System.ClientModel;
+using System.Reflection;
 using Azure.Identity;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Agents;
@@ -26,6 +27,45 @@ public class Step06_FoundryAgentProcess : BaseTest
 
     // Target Open AI Services
     protected override bool ForceOpenAI => true;
+
+    [Fact]
+    public async Task FDLTest()
+    {
+        var resource = Assembly.GetExecutingAssembly().GetManifestResourceStream("Step06.DeepResearchAgent.fdl");
+        if (resource is null)
+        {
+            throw new FileNotFoundException("The FDL resource was not found in the assembly.");
+        }
+
+        using var reader = new StreamReader(resource);
+        var fdlContent = await reader.ReadToEndAsync();
+
+        var serializer = new WorkflowEngine.Serialization.WorkflowSerializer();
+        var workflowDefinition = serializer.DeserializeFromYaml(fdlContent);
+        var serializedYaml = serializer.SerializeToYaml(workflowDefinition);
+
+        var process = StateMachineBuilder.Build(workflowDefinition);
+
+        Console.WriteLine("Done");
+    }
+
+    [Fact]
+    public async Task ObjectModelTest()
+    {
+        var resource = Assembly.GetExecutingAssembly().GetManifestResourceStream("Step06.deepResearch.yaml");
+        if (resource is null)
+        {
+            throw new FileNotFoundException("The Object Model resource was not found in the assembly.");
+        }
+
+        using var reader = new StreamReader(resource);
+        var omContent = await reader.ReadToEndAsync();
+
+        var builder = new ObjectModelBuilder();
+        builder.Build(omContent);
+
+        Console.WriteLine("Done");
+    }
 
     /// <summary>
     /// This example demonstrates how to create a process with two agents that can chat with each other. A student agent and a teacher agent are created.
