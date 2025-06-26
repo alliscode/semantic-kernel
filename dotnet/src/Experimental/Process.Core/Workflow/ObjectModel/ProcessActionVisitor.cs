@@ -66,6 +66,7 @@ internal class ProcessActionVisitor : DialogActionVisitor
         config.EnableSetFunction();
         config.MaximumExpressionLength = 2000;
         var engine = new RecalcEngine(config);
+        engine.UpdateVariable("Topic", record);
 
         foreach (var action in actions)
         {
