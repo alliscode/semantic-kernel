@@ -12,17 +12,17 @@ using Microsoft.SemanticKernel.ChatCompletion;
 
 namespace Microsoft.SemanticKernel;
 
-internal class ProcessActionVisitor : DialogActionVisitor
+internal sealed class ProcessActionVisitor : DialogActionVisitor
 {
     private readonly ProcessBuilder _processBuilder;
 
-    public ProcessActionVisitor(RecalcEngine engine, ProcessBuilder processBuilder, StepContext currentContext)
+    public ProcessActionVisitor(RecalcEngine engine, ProcessBuilder processBuilder, ProcessActionStepContext currentContext)
     {
         this._processBuilder = processBuilder;
         this.CurrentContext = currentContext;
     }
 
-    private StepContext CurrentContext { get; set; }
+    private ProcessActionStepContext CurrentContext { get; set; }
 
     private void MoveToNewContext(string contextId)
     {
@@ -38,44 +38,28 @@ internal class ProcessActionVisitor : DialogActionVisitor
         this.CurrentContext.EdgeBuilder.SendEventTo(new ProcessFunctionTargetBuilder(stepBuilder));
 
         // 2. Move to the new step context
-        this.CurrentContext = new StepContext
+        this.CurrentContext = new ProcessActionStepContext
         {
             EdgeBuilder = stepBuilder.OnFunctionResult("Invoke")
         };
     }
 
-    private static async Task ExecuteActionsAsync(Kernel kernel, KernelProcessStepContext context, List<Func<Kernel, KernelProcessStepContext, RecalcEngine, Dictionary<string, Dictionary<string, FormulaValue>>, Task>> actions)
+    private static async Task ExecuteActionsAsync(Kernel kernel, KernelProcessStepContext context, List<Func<Kernel, KernelProcessStepContext, RecalcEngine, ProcessActionScopes, Task>> actions)
     {
-        RecordValue BuildRecord(Dictionary<string, FormulaValue> fields)
-        {
-            var recordType = RecordType.Empty();
-            foreach (var kvp in fields)
-            {
-                recordType = recordType.Add(kvp.Key, kvp.Value.Type);
-            }
+        var scopes = await context.GetUserStateAsync<ProcessActionScopes>("scopes").ConfigureAwait(false);
+        var record = BuildRecord(scopes[ActionScopeTypes.Topic]);
 
-            return FormulaValue.NewRecordFromFields(recordType,
-                [.. fields.Select(kvp => new NamedValue(kvp.Key, kvp.Value))]);
-        }
-
-        var scopes = await context.GetUserStateAsync<Dictionary<string, Dictionary<string, FormulaValue>>>("scopes").ConfigureAwait(false);
-        var record = BuildRecord(scopes["Topic"]);
-
-        Features toenable = Features.PowerFxV1;
-        var config = new PowerFxConfig(toenable);
-        config.EnableSetFunction();
-        config.MaximumExpressionLength = 2000;
-        var engine = new RecalcEngine(config);
-        engine.UpdateVariable("Topic", record);
+        RecalcEngine engine = EngineFactory.CreateDefault();
+        engine.UpdateVariable(ActionScopeTypes.Topic, record);
 
         foreach (var action in actions)
         {
             // Execute each action in the current context
-            await action(kernel, context, engine, scopes).ConfigureAwait(false);
+            await action.Invoke(kernel, context, engine, scopes).ConfigureAwait(false);
         }
     }
 
-    private static void SetScopedVariable(RecalcEngine engine, Dictionary<string, Dictionary<string, FormulaValue>> scopes, string? scopeName, string? varName, FormulaValue value)
+    private static void SetScopedVariable(RecalcEngine engine, ProcessActionScopes scopes, string? scopeName, string? varName, FormulaValue value)
     {
         if (scopeName is null)
         {
@@ -99,7 +83,7 @@ internal class ProcessActionVisitor : DialogActionVisitor
         engine.UpdateVariable(scopeName, scopeRecord);
     }
 
-    private static RecordValue BuildRecord(Dictionary<string, FormulaValue> fields)
+    private static RecordValue BuildRecord(ProcessActionScope fields)
     {
         var recordType = RecordType.Empty();
         foreach (var kvp in fields)
@@ -324,28 +308,28 @@ internal class ProcessActionVisitor : DialogActionVisitor
                 expression = expression.Substring(1);
             }
 
-            this.CurrentContext.Actions.Add((kernel, context, engine, scopes) =>
-            {
-                FormulaValue? result = null;
-                try
+            this.CurrentContext.Actions.Add(
+                (kernel, context, engine, scopes) =>
                 {
-                    result = engine.Eval(expression);
-                }
-                catch (Exception)
-                {
-                    throw;
-                }
+                    FormulaValue result;
+                    try
+                    {
+                        result = engine.Eval(expression);
+                    }
+                    catch (Exception)
+                    {
+                        throw; // %%% TODO: WRAP AND RETHROW (OR REMOVE HANDLER)
+                    }
 
-                if (result is ErrorValue errorVal)
-                {
-                    throw new InvalidOperationException("PowerFX error: " + errorVal.Errors[0].Message);
-                }
+                    if (result is ErrorValue errorVal)
+                    {
+                        throw new InvalidOperationException("PowerFX error: " + errorVal.Errors[0].Message);
+                    }
 
-                var value = result;
-                SetScopedVariable(engine, scopes, item.Variable.Path.VariableScopeName, item.Variable.Path.VariableName, value);
+                    SetScopedVariable(engine, scopes, item.Variable.Path.VariableScopeName, item.Variable.Path.VariableName, result);
 
-                return Task.CompletedTask;
-            });
+                    return Task.CompletedTask;
+                });
         }
     }
 
