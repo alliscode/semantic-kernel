@@ -61,15 +61,13 @@ public sealed class KernelProcessStepContext
     /// <param name="key">The key to identify the user state.</param>
     /// <typeparam name="T"></typeparam>
     /// <returns></returns>
-    public Task<T>? GetUserStateAsync<T>(string key) where T : class
+    public Task<T> GetUserStateAsync<T>(string key) where T : class
     {
         IKernelProcessUserStateStore? x = this._userStateStore;
-        if (x != null)
-        {
-            return x.GetUserStateAsync<T>(key);
-        }
-
-        return Task.FromResult<T>(null);
+        return
+            x == null ?
+                Task.FromResult<T>(null!) :
+                x.GetUserStateAsync<T>(key);
     }
 
     /// <summary>
@@ -79,14 +77,12 @@ public sealed class KernelProcessStepContext
     /// <param name="key"></param>
     /// <param name="state"></param>
     /// <returns></returns>
-    public Task? SetUserStateAsync<T>(string key, T state) where T : class
+    public Task SetUserStateAsync<T>(string key, T state) where T : class
     {
         IKernelProcessUserStateStore? x = this._userStateStore;
-        if (x != null)
-        {
-            return x.SetUserStateAsync(key, state);
-        }
-
-        return Task.CompletedTask;
+        return
+            x == null ?
+                Task.CompletedTask :
+                x.SetUserStateAsync(key, state);
     }
 }
