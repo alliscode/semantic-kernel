@@ -3,25 +3,112 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.Bot.ObjectModel;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.PowerFx;
 using Microsoft.PowerFx.Types;
+using Microsoft.SemanticKernel.ChatCompletion;
+using YamlDotNet.Core.Tokens;
 
 namespace Microsoft.SemanticKernel;
 
-internal class ProcessActionVisitor :  DialogActionVisitor
+internal class ProcessActionVisitor : DialogActionVisitor
 {
-    private readonly RecalcEngine _engine;
-    private readonly Dictionary<string, Dictionary<string, FormulaValue>> _scopes = new()
-    {
-        ["Topic"] = [],
-        ["Global"] = [],
-        ["System"] = []
-    };
+    private readonly ProcessBuilder _processBuilder;
 
-    public ProcessActionVisitor(RecalcEngine engine)
+    public ProcessActionVisitor(RecalcEngine engine, ProcessBuilder processBuilder, StepContext currentContext)
     {
-        this._engine = engine;
+        this._processBuilder = processBuilder;
+        this.CurrentContext = currentContext;
+    }
+
+    private StepContext CurrentContext { get; set; }
+
+    private void CloseCurrentContext(string contextId)
+    {
+        var actions = this.CurrentContext.Actions;
+
+        // 1. Close the current context by creating a step to execute all the current actions
+        var stepBuilder = this._processBuilder.AddStep(contextId, async (kernel, context) =>
+        {
+            await ExecuteActionsAsync(kernel, context, actions).ConfigureAwait(false);
+        });
+
+        // 2. When the current step ends, activate the next step
+        this.CurrentContext.EdgeBuilder.SendEventTo(new ProcessFunctionTargetBuilder(stepBuilder));
+
+        // 2. Move to the new step context
+        this.CurrentContext = new StepContext
+        {
+            EdgeBuilder = stepBuilder.OnFunctionResult("Invoke")
+        };
+    }
+
+    private static async Task ExecuteActionsAsync(Kernel kernel, KernelProcessStepContext context, List<Func<Kernel, KernelProcessStepContext, RecalcEngine, Dictionary<string, Dictionary<string, FormulaValue>>, Task>> actions)
+    {
+        RecordValue BuildRecord(Dictionary<string, FormulaValue> fields)
+        {
+            var recordType = RecordType.Empty();
+            foreach (var kvp in fields)
+            {
+                recordType = recordType.Add(kvp.Key, kvp.Value.Type);
+            }
+
+            return FormulaValue.NewRecordFromFields(recordType,
+                [.. fields.Select(kvp => new NamedValue(kvp.Key, kvp.Value))]);
+        }
+
+        var scopes = await context.GetUserStateAsync<Dictionary<string, Dictionary<string, FormulaValue>>>("scopes").ConfigureAwait(false);
+        var record = BuildRecord(scopes["Topic"]);
+
+        Features toenable = Features.PowerFxV1;
+        var config = new PowerFxConfig(toenable);
+        config.EnableSetFunction();
+        config.MaximumExpressionLength = 2000;
+        var engine = new RecalcEngine(config);
+
+        foreach (var action in actions)
+        {
+            // Execute each action in the current context
+            action(kernel, context, engine, scopes);
+        }
+    }
+
+    private static void SetScopedVariable(RecalcEngine engine, Dictionary<string, Dictionary<string, FormulaValue>> scopes, string? scopeName, string? varName, FormulaValue value)
+    {
+        if (scopeName is null)
+        {
+            throw new InvalidOperationException("Scope name cannot be null.");
+        }
+
+        if (varName is null)
+        {
+            throw new InvalidOperationException("Variable name cannot be null.");
+        }
+
+        if (!scopes.TryGetValue(scopeName, out var scope))
+        {
+            throw new InvalidOperationException("Unknown scope: " + scopeName);
+        }
+
+        scope[varName] = value;
+
+        // Rebuild scope record and update engine
+        var scopeRecord = BuildRecord(scope);
+        engine.UpdateVariable(scopeName, scopeRecord);
+    }
+
+    private static RecordValue BuildRecord(Dictionary<string, FormulaValue> fields)
+    {
+        var recordType = RecordType.Empty();
+        foreach (var kvp in fields)
+        {
+            recordType = recordType.Add(kvp.Key, kvp.Value.Type);
+        }
+
+        return FormulaValue.NewRecordFromFields(recordType,
+            [.. fields.Select(kvp => new NamedValue(kvp.Key, kvp.Value))]);
     }
 
     protected override void Visit(UnknownDialogAction item)
@@ -62,6 +149,8 @@ internal class ProcessActionVisitor :  DialogActionVisitor
     protected override void Visit(Question item)
     {
         Console.WriteLine(item);
+
+        this.CloseCurrentContext(item.Id.Value);
     }
 
     protected override void Visit(CSATQuestion item)
@@ -86,7 +175,7 @@ internal class ProcessActionVisitor :  DialogActionVisitor
 
     protected override void Visit(BeginDialog item)
     {
-        Console.WriteLine(item);
+        this.CloseCurrentContext(item.Id.Value);
     }
 
     protected override void Visit(RepeatDialog item)
@@ -182,6 +271,11 @@ internal class ProcessActionVisitor :  DialogActionVisitor
     protected override void Visit(ConditionGroup item)
     {
         Console.WriteLine(item);
+        foreach (var conditions in item.Conditions)
+        {
+            // Visit each action in the condition group
+            conditions.Accept(this);
+        }
     }
 
     protected override void Visit(EndConversation item)
@@ -217,7 +311,7 @@ internal class ProcessActionVisitor :  DialogActionVisitor
         {
             if (item.Variable?.Path is null)
             {
-                return;
+                throw new KernelException("SetVariable action must have a variable path defined.");
             }
 
             var expression = item.Value.ExpressionText;
@@ -226,68 +320,28 @@ internal class ProcessActionVisitor :  DialogActionVisitor
                 expression = expression.Substring(1);
             }
 
-            FormulaValue? result = null;
-            try
+            this.CurrentContext.Actions.Add((kernel, context, engine, scopes) =>
             {
-                result = this._engine.Eval(expression);
-            }
-            catch (Exception)
-            {
-                throw;
-            }
+                FormulaValue? result = null;
+                try
+                {
+                    result = engine.Eval(expression);
+                }
+                catch (Exception)
+                {
+                    throw;
+                }
 
-            if (result is ErrorValue errorVal)
-            {
-                throw new InvalidOperationException("PowerFX error: " + errorVal.Errors[0].Message);
-            }
+                if (result is ErrorValue errorVal)
+                {
+                    throw new InvalidOperationException("PowerFX error: " + errorVal.Errors[0].Message);
+                }
 
-            var value = result;
-            this.SetScopedVariable(item.Variable.Path.VariableScopeName, item.Variable.Path.VariableName, value);
-        }
-    }
+                var value = result;
+                SetScopedVariable(engine, scopes, item.Variable.Path.VariableScopeName, item.Variable.Path.VariableName, value);
 
-    private void SetScopedVariable(string? scopeName, string? varName, FormulaValue value)
-    {
-        if (scopeName is null)
-        {
-            throw new InvalidOperationException("Scope name cannot be null.");
-        }
-
-        if (varName is null)
-        {
-            throw new InvalidOperationException("Variable name cannot be null.");
-        }
-
-        if (!this._scopes.TryGetValue(scopeName, out var scope))
-        {
-            throw new InvalidOperationException("Unknown scope: " + scopeName);
-        }
-
-        scope[varName] = value;
-
-        // Rebuild scope record and update engine
-        var scopeRecord = this.BuildRecord(scope);
-        this._engine.UpdateVariable(scopeName, scopeRecord);
-    }
-
-    private RecordValue BuildRecord(Dictionary<string, FormulaValue> fields)
-    {
-        var recordType = RecordType.Empty();
-        foreach (var kvp in fields)
-        {
-            recordType = recordType.Add(kvp.Key, kvp.Value.Type);
-        }
-
-        return FormulaValue.NewRecordFromFields(recordType,
-            [.. fields.Select(kvp => new NamedValue(kvp.Key, kvp.Value))]);
-    }
-
-    private void RefreshAllScopes()
-    {
-        foreach (var scope in this._scopes)
-        {
-            var record = this.BuildRecord(scope.Value);
-            this._engine.UpdateVariable(scope.Key, record);
+                return Task.CompletedTask;
+            });
         }
     }
 
@@ -348,8 +402,39 @@ internal class ProcessActionVisitor :  DialogActionVisitor
 
     protected override void Visit(AnswerQuestionWithAI item)
     {
-        Console.WriteLine(item);
-        // This should map to a step invokes a custom model to answer a question.
+        if (item.UserInput is null || string.IsNullOrWhiteSpace(item.UserInput.ExpressionText))
+        {
+            throw new InvalidOperationException("UserInput and ExpressionText must be defined for AnswerQuestionWithAI action.");
+        }
+
+        if (item.Variable?.Path is null)
+        {
+            throw new KernelException("SetVariable action must have a variable path defined.");
+        }
+
+        // Close the current context before adding the new action
+        this.CloseCurrentContext(item.Id.Value);
+
+        this.CurrentContext.Actions.Add(async (kernel, context, engine, scopes) =>
+        {
+            var chatCompletion = kernel.Services.GetRequiredService<IChatCompletionService>() ?? throw new InvalidOperationException("ChatCompletionService is not registered in the service collection.");
+            var expressionResult = engine.Eval(item.UserInput.ExpressionText);
+            if (expressionResult is not StringValue str)
+            {
+                throw new InvalidOperationException("UserInput expression must evaluate to a string.");
+            }
+
+            ChatHistory history = new();
+            history.AddUserMessage(str.Value);
+            var response = await chatCompletion.GetChatMessageContentsAsync(history).ConfigureAwait(false);
+            var value = FormulaValue.New(response.ToString());
+
+            SetScopedVariable(engine, scopes, item.Variable.Path.VariableScopeName, item.Variable.Path.VariableName, value);
+        });
+
+        // Thats the only action for this step, so we close the context
+        // TODO: I can't create the next step here because I don't know the ID yet. Hacked to move on for now.
+        this.CloseCurrentContext($"{item.Id.Value}_new");
     }
 
     protected override void Visit(InvokeCustomModelAction item)

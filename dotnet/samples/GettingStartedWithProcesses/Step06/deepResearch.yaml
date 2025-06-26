@@ -262,6 +262,7 @@ beginDialog:
             - kind: AnswerQuestionWithAI
               id: sendActivity_Pkkmpq
               displayName: Generate Response
+              variable: Topic.FinalResponse
               userInput: |-
                 ="
                 We are working on the following task:

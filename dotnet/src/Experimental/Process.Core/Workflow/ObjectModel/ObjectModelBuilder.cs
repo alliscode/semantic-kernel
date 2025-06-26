@@ -1,7 +1,12 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 using Microsoft.Bot.ObjectModel;
 using Microsoft.PowerFx;
+using Microsoft.PowerFx.Types;
+using static Microsoft.SemanticKernel.KernelProcess;
 
 namespace Microsoft.SemanticKernel;
 
@@ -29,9 +34,43 @@ public class ObjectModelBuilder : BotElementWalker
     /// </summary>
     /// <param name="topicYaml"></param>
     /// <returns></returns>
-    public void Build(string topicYaml)
+    public KernelProcess Build(string topicYaml)
     {
-        var walker = new ProcessActionWalker(this._engine);
+        ProcessBuilder processBuilder = new("topic");
+        var walker = new ProcessActionWalker(this._engine, processBuilder);
         walker.ProcessYaml(topicYaml);
+        return processBuilder.Build();
     }
+}
+
+/// <summary>
+/// Step in a process that represents an ObjectModel.
+/// </summary>
+public class ObjectModelProcessStep : KernelProcessStep
+{
+    /// <summary>
+    /// The actions.
+    /// </summary>
+    public List<DialogAction> Actions { get; set; } = [];
+}
+
+/// <summary>
+/// Step context for the current step in a process.
+/// </summary>
+public class StepContext
+{
+    /// <summary>
+    /// Step Builder for the current step.
+    /// </summary>
+    //public required ProcessStepBuilder StepBuilder { get; set; }
+
+    /// <summary>
+    /// The edge builder for the current step.
+    /// </summary>
+    public required ProcessStepEdgeBuilder EdgeBuilder { get; set; }
+
+    /// <summary>
+    /// The actions.
+    /// </summary>
+    public List<Func<Kernel, KernelProcessStepContext, RecalcEngine, Dictionary<string, Dictionary<string, FormulaValue>>, Task>> Actions { get; set; } = [];
 }

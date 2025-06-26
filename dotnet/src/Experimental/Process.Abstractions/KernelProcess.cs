@@ -2,6 +2,8 @@
 
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
+using Microsoft.SemanticKernel.Process;
 using Microsoft.SemanticKernel.Process.Internal;
 using Microsoft.SemanticKernel.Process.Models;
 
@@ -26,6 +28,14 @@ public sealed record KernelProcess : KernelProcessStepInfo
     /// The type of the user state. This is used to identify the underlying state type.
     /// </summary>
     public Type? UserStateType { get; init; } = null;
+
+    /// <summary>
+    /// Step funtion delegate
+    /// </summary>
+    /// <param name="kernel"></param>
+    /// <param name="context"></param>
+    /// <returns></returns>
+    public delegate Task StepFunction(Kernel kernel, KernelProcessStepContext context);
 
     /// <summary>
     /// Captures Kernel Process State into <see cref="KernelProcessStateMetadata"/> after process has run

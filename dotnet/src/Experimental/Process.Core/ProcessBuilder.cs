@@ -9,6 +9,7 @@ using Microsoft.SemanticKernel.Agents.AzureAI;
 using Microsoft.SemanticKernel.Process;
 using Microsoft.SemanticKernel.Process.Internal;
 using Microsoft.SemanticKernel.Process.Tools;
+using static Microsoft.SemanticKernel.KernelProcess;
 
 namespace Microsoft.SemanticKernel;
 
@@ -207,6 +208,18 @@ public sealed partial class ProcessBuilder : ProcessStepBuilder
     {
         ProcessStepBuilderTyped stepBuilder = new(stepType: stepType, id: id ?? stepType.Name, this.ProcessBuilder);
 
+        return this.AddStep(stepBuilder, aliases);
+    }
+
+    /// <summary>
+    /// Add a step
+    /// </summary>
+    /// <param name="id"></param>
+    /// <param name="stepFunction"></param>
+    /// <returns></returns>
+    public ProcessStepBuilder AddStep(string id, StepFunction stepFunction, IReadOnlyList<string>? aliases = null)
+    {
+        ProcessDelegateBuilder stepBuilder = new(id, stepFunction, this);
         return this.AddStep(stepBuilder, aliases);
     }
 

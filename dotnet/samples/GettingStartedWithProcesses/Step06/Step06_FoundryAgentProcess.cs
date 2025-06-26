@@ -62,7 +62,7 @@ public class Step06_FoundryAgentProcess : BaseTest
         var omContent = await reader.ReadToEndAsync();
 
         var builder = new ObjectModelBuilder();
-        builder.Build(omContent);
+        var process = builder.Build(omContent);
 
         Console.WriteLine("Done");
     }
