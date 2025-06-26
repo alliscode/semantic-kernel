@@ -1,6 +1,5 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
-using System;
 using System.Threading.Tasks;
 
 namespace Microsoft.SemanticKernel;
@@ -11,14 +10,16 @@ namespace Microsoft.SemanticKernel;
 public sealed class KernelProcessStepContext
 {
     private readonly IKernelProcessMessageChannel _stepMessageChannel;
+    private readonly IKernelProcessUserStateStore? _userStateStore;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="KernelProcessStepContext"/> class.
     /// </summary>
     /// <param name="channel">An instance of <see cref="IKernelProcessMessageChannel"/>.</param>
-    public KernelProcessStepContext(IKernelProcessMessageChannel channel)
+    public KernelProcessStepContext(IKernelProcessMessageChannel channel, IKernelProcessUserStateStore? userStateStore = null)
     {
         this._stepMessageChannel = channel;
+        this._userStateStore = userStateStore;
     }
 
     /// <summary>
@@ -60,9 +61,15 @@ public sealed class KernelProcessStepContext
     /// <param name="key">The key to identify the user state.</param>
     /// <typeparam name="T"></typeparam>
     /// <returns></returns>
-    public Task<T> GetUserStateAsync<T>(string key) where T : class
+    public Task<T>? GetUserStateAsync<T>(string key) where T : class
     {
-        throw new NotImplementedException("GetUserStateAsync is not implemented yet.");
+        IKernelProcessUserStateStore? x = this._userStateStore;
+        if (x != null)
+        {
+            return x.GetUserStateAsync<T>(key);
+        }
+
+        return Task.FromResult<T>(null);
     }
 
     /// <summary>
@@ -72,8 +79,14 @@ public sealed class KernelProcessStepContext
     /// <param name="key"></param>
     /// <param name="state"></param>
     /// <returns></returns>
-    public Task SetUserStateAsync<T>(string key, T state) where T : class
+    public Task? SetUserStateAsync<T>(string key, T state) where T : class
     {
-        throw new NotImplementedException("SetUserStateAsync is not implemented yet.");
+        IKernelProcessUserStateStore? x = this._userStateStore;
+        if (x != null)
+        {
+            return x.SetUserStateAsync(key, state);
+        }
+
+        return Task.CompletedTask;
     }
 }

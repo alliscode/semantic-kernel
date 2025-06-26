@@ -44,17 +44,6 @@ public class ObjectModelBuilder : BotElementWalker
 }
 
 /// <summary>
-/// Step in a process that represents an ObjectModel.
-/// </summary>
-public class ObjectModelProcessStep : KernelProcessStep
-{
-    /// <summary>
-    /// The actions.
-    /// </summary>
-    public List<DialogAction> Actions { get; set; } = [];
-}
-
-/// <summary>
 /// Step context for the current step in a process.
 /// </summary>
 public class StepContext

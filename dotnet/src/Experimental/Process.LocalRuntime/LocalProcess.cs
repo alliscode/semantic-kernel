@@ -36,6 +36,7 @@ internal sealed class LocalProcess : LocalStep, System.IAsyncDisposable
     private JoinableTask? _processTask;
     private CancellationTokenSource? _processCancelSource;
     private ProcessStateManager? _processStateManager;
+    private LocalUserStateStore _userStateStore;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="LocalProcess"/> class.
@@ -57,6 +58,7 @@ internal sealed class LocalProcess : LocalStep, System.IAsyncDisposable
         this._logger = this._kernel.LoggerFactory?.CreateLogger(this.Name) ?? new NullLogger<LocalStep>();
         // if parent id is null this is the root process
         this.RootProcessId = this.ParentProcessId == null ? this.Id : null;
+        this._userStateStore = new LocalUserStateStore();
     }
 
     /// <summary>
@@ -351,6 +353,15 @@ internal sealed class LocalProcess : LocalStep, System.IAsyncDisposable
 
                 localStep = new LocalAgentStep(agentStep, this._kernel, thread, this._processStateManager, this.ParentProcessId);
             }
+            else if (stepInfo is KernelProcessDelegateStepInfo delegateStep)
+            {
+                localStep = new LocalDelegateStep(delegateStep, this._kernel, this._userStateStore)
+                {
+                    ParentProcessId = this.Id,
+                    EventProxy = this.EventProxy,
+                    StorageManager = this.StorageManager,
+                };
+            }
             else
             {
                 // The current step should already have an Id.
@@ -537,6 +548,11 @@ internal sealed class LocalProcess : LocalStep, System.IAsyncDisposable
                 }
             }
         }
+
+        if (!foundEdge)
+        {
+            int edgeCount = edges.Count();
+        }
     }
 
     private async Task EnqueueOnEnterMessagesAsync(Queue<ProcessMessage> messageChannel)
@@ -593,7 +609,12 @@ internal sealed class LocalProcess : LocalStep, System.IAsyncDisposable
                 base.EmitEvent(stepEvent);
             }
 
-            await this.EnqueueEdgesAsync(step.GetEdgeForEvent(stepEvent.QualifiedId), messageChannel, stepEvent).ConfigureAwait(false);
+            var events = step.GetEdgeForEvent(stepEvent.QualifiedId);
+            if (events.Count() == 0)
+            {
+                int x = 3;
+            }
+            await this.EnqueueEdgesAsync(events, messageChannel, stepEvent).ConfigureAwait(false);
             // Get the edges for the event and queue up the messages to be sent to the next steps.
             //bool foundEdge = false;
             //foreach (KernelProcessEdge edge in step.GetEdgeForEvent(stepEvent.QualifiedId))

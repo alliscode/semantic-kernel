@@ -16,7 +16,7 @@ namespace Microsoft.SemanticKernel;
 /// <summary>
 /// Represents a step in a process that is running in-process.
 /// </summary>
-internal class LocalStep : IKernelProcessMessageChannel
+internal class LocalStep : IKernelProcessMessageChannel, IKernelProcessUserStateStore
 {
     private readonly Queue<ProcessEvent> _outgoingEventQueue = new();
     protected readonly Lazy<ValueTask> _initializeTask;
@@ -34,6 +34,7 @@ internal class LocalStep : IKernelProcessMessageChannel
     internal KernelProcessStep? _stepInstance = null;
     internal readonly KernelProcessStepInfo _stepInfo;
     internal readonly string _eventNamespace;
+    private readonly LocalUserStateStore? _userStateStore;
 
     /// <summary>
     /// Represents a step in a process that is running in-process.
@@ -42,7 +43,7 @@ internal class LocalStep : IKernelProcessMessageChannel
     /// <param name="kernel">Required. An instance of <see cref="Kernel"/>.</param>
     /// <param name="parentProcessId">Optional. The Id of the parent process if one exists.</param>
     /// <param name="instanceId">Optional: Id of the process if given</param>
-    public LocalStep(KernelProcessStepInfo stepInfo, Kernel kernel, string? parentProcessId = null, string? instanceId = null)
+    public LocalStep(KernelProcessStepInfo stepInfo, Kernel kernel, string? parentProcessId = null, string? instanceId = null, LocalUserStateStore? userStateStore = null)
     {
         Verify.NotNull(kernel, nameof(kernel));
         Verify.NotNull(stepInfo, nameof(stepInfo));
@@ -72,6 +73,7 @@ internal class LocalStep : IKernelProcessMessageChannel
         this._outputEdges = this._stepInfo.Edges.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToList());
         this._eventNamespace = this.Id;
         this._edgeGroupProcessors = this._stepInfo.IncomingEdgeGroups?.ToDictionary(kvp => kvp.Key, kvp => new LocalEdgeGroupProcessor(kvp.Value)) ?? [];
+        this._userStateStore = userStateStore;
     }
 
     internal void InitializeStepInitialInputs()
@@ -101,7 +103,7 @@ internal class LocalStep : IKernelProcessMessageChannel
 
     internal virtual void PopulateInitialInputs()
     {
-        this._initialInputs = this.FindInputChannels(this._functions, this._logger, this.ExternalMessageChannel);
+        this._initialInputs = this.FindInputChannels(this._functions, this._logger, this.ExternalMessageChannel, stateStore: this);
     }
 
     /// <summary>
@@ -545,5 +547,25 @@ internal class LocalStep : IKernelProcessMessageChannel
     {
         Verify.NotNull(localEvent, nameof(localEvent));
         return localEvent with { Namespace = this.Id };
+    }
+
+    public Task<T> GetUserStateAsync<T>(string key) where T : class
+    {
+        if (this._userStateStore is null)
+        {
+            throw new NotImplementedException("User state store is not implemented for this step.");
+        }
+
+        return this._userStateStore.GetUserStateAsync<T>(key);
+    }
+
+    public Task SetUserStateAsync<T>(string key, T state) where T : class
+    {
+        if (this._userStateStore is null)
+        {
+            throw new NotImplementedException("User state store is not implemented for this step.");
+        }
+
+        return this._userStateStore.SetUserStateAsync(key, state);
     }
 }

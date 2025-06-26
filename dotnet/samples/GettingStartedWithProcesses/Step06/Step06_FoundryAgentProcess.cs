@@ -2,6 +2,7 @@
 
 using System.ClientModel;
 using System.Reflection;
+using Azure.AI.OpenAI;
 using Azure.Identity;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Agents;
@@ -63,6 +64,12 @@ public class Step06_FoundryAgentProcess : BaseTest
 
         var builder = new ObjectModelBuilder();
         var process = builder.Build(omContent);
+
+        var kernelBuilder = Kernel.CreateBuilder()
+            .AddAzureOpenAIChatClient(TestConfiguration.AzureAI.ChatModelId, new AzureOpenAIClient(new Uri(TestConfiguration.AzureAI.Endpoint), new DefaultAzureCredential()));
+        var kernel = kernelBuilder.Build();
+
+        var context = await process.StartAsync(kernel, new KernelProcessEvent() { Id = "message" }, Guid.NewGuid().ToString());
 
         Console.WriteLine("Done");
     }

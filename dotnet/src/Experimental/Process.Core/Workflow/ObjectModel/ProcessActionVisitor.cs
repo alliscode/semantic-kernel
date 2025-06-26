@@ -9,7 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.PowerFx;
 using Microsoft.PowerFx.Types;
 using Microsoft.SemanticKernel.ChatCompletion;
-using YamlDotNet.Core.Tokens;
 
 namespace Microsoft.SemanticKernel;
 
@@ -25,7 +24,7 @@ internal class ProcessActionVisitor : DialogActionVisitor
 
     private StepContext CurrentContext { get; set; }
 
-    private void CloseCurrentContext(string contextId)
+    private void MoveToNewContext(string contextId)
     {
         var actions = this.CurrentContext.Actions;
 
@@ -71,7 +70,7 @@ internal class ProcessActionVisitor : DialogActionVisitor
         foreach (var action in actions)
         {
             // Execute each action in the current context
-            action(kernel, context, engine, scopes);
+            await action(kernel, context, engine, scopes).ConfigureAwait(false);
         }
     }
 
@@ -150,7 +149,7 @@ internal class ProcessActionVisitor : DialogActionVisitor
     {
         Console.WriteLine(item);
 
-        this.CloseCurrentContext(item.Id.Value);
+        this.MoveToNewContext(item.Id.Value);
     }
 
     protected override void Visit(CSATQuestion item)
@@ -175,7 +174,7 @@ internal class ProcessActionVisitor : DialogActionVisitor
 
     protected override void Visit(BeginDialog item)
     {
-        this.CloseCurrentContext(item.Id.Value);
+        this.MoveToNewContext(item.Id.Value);
     }
 
     protected override void Visit(RepeatDialog item)
@@ -306,7 +305,11 @@ internal class ProcessActionVisitor : DialogActionVisitor
 
     protected override void Visit(SetVariable item)
     {
-        Console.WriteLine(item);
+        Console.WriteLine($"Adding Step from {item.GetType().Name} node with Id {item.Id.Value}");
+
+        // Create a new step for the SetVariable action
+        this.MoveToNewContext(item.Id.Value);
+
         if (item.Value is not null && item.Value.IsExpression)
         {
             if (item.Variable?.Path is null)
@@ -413,7 +416,7 @@ internal class ProcessActionVisitor : DialogActionVisitor
         }
 
         // Close the current context before adding the new action
-        this.CloseCurrentContext(item.Id.Value);
+        this.MoveToNewContext(item.Id.Value);
 
         this.CurrentContext.Actions.Add(async (kernel, context, engine, scopes) =>
         {
@@ -431,10 +434,6 @@ internal class ProcessActionVisitor : DialogActionVisitor
 
             SetScopedVariable(engine, scopes, item.Variable.Path.VariableScopeName, item.Variable.Path.VariableName, value);
         });
-
-        // Thats the only action for this step, so we close the context
-        // TODO: I can't create the next step here because I don't know the ID yet. Hacked to move on for now.
-        this.CloseCurrentContext($"{item.Id.Value}_new");
     }
 
     protected override void Visit(InvokeCustomModelAction item)

@@ -40,7 +40,10 @@ public class ProcessDelegateBuilder : ProcessStepBuilder
 
         KernelProcessMapState state = new(this.StepId, this.Version, this.StepId);
 
-        return new KernelProcessDelegateStep(typeof(StepFunction), state, builtEdges);
+        return new KernelProcessDelegateStepInfo(typeof(KernelDelegateProcessStep), state, builtEdges)
+        {
+            StepFunction = this.StepFunction
+        };
     }
 
     internal override Dictionary<string, KernelFunctionMetadata> GetFunctionMetadataMap()

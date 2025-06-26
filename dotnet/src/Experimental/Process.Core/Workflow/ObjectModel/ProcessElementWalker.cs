@@ -1,9 +1,11 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
 using System;
+using System.Collections.Generic;
 using Microsoft.Bot.ObjectModel;
 using Microsoft.Bot.ObjectModel.Yaml;
 using Microsoft.PowerFx;
+using Microsoft.PowerFx.Types;
 
 namespace Microsoft.SemanticKernel;
 internal class ProcessActionWalker : BotElementWalker
@@ -35,9 +37,23 @@ internal class ProcessActionWalker : BotElementWalker
     {
         if (definition is TriggerBase trigger && this._visitor is null)
         {
+            Dictionary<string, Dictionary<string, FormulaValue>> scopes = new()
+            {
+                ["Topic"] = [],
+                ["Global"] = [],
+                ["System"] = []
+            };
+
+            var initStep = this._processBuilder.AddStep("init", async (kernal, context) =>
+            {
+                await context.SetUserStateAsync("scopes", scopes).ConfigureAwait(false);
+            });
+
+            this._processBuilder.OnInputEvent("message").SendEventTo(new ProcessFunctionTargetBuilder(initStep));
+
             var context = new StepContext
             {
-                EdgeBuilder = this._processBuilder.OnInputEvent("message")
+                EdgeBuilder = initStep.OnFunctionResult("Invoke")
             };
 
             this._visitor = new ProcessActionVisitor(this._engine, this._processBuilder, context);

@@ -112,7 +112,8 @@ internal static class StepExtensions
         Dictionary<string, KernelFunction> functions,
         ILogger? logger,
         IExternalKernelProcessMessageChannel? externalMessageChannel = null,
-        AgentDefinition? agentDefinition = null)
+        AgentDefinition? agentDefinition = null,
+        IKernelProcessUserStateStore? stateStore = null)
     {
         if (functions is null)
         {
@@ -135,7 +136,7 @@ internal static class StepExtensions
                 // and are instantiated here.
                 if (param.ParameterType == typeof(KernelProcessStepContext))
                 {
-                    inputs[kvp.Key]![param.Name] = new KernelProcessStepContext(channel);
+                    inputs[kvp.Key]![param.Name] = new KernelProcessStepContext(channel, stateStore);
                 }
                 else if (param.ParameterType == typeof(KernelProcessStepExternalContext))
                 {
