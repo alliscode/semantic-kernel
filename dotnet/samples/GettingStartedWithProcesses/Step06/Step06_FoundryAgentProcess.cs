@@ -62,16 +62,16 @@ public class Step06_FoundryAgentProcess : BaseTest
         using var reader = new StreamReader(resource);
         var omContent = await reader.ReadToEndAsync();
 
+        Console.WriteLine("PROCESS INIT");
         var builder = new ObjectModelBuilder();
         var process = builder.Build(omContent);
 
-        var kernelBuilder = Kernel.CreateBuilder()
-            .AddAzureOpenAIChatClient(TestConfiguration.AzureAI.ChatModelId, new AzureOpenAIClient(new Uri(TestConfiguration.AzureAI.Endpoint), new DefaultAzureCredential()));
-        var kernel = kernelBuilder.Build();
+        var kernel = this.CreateKernelWithChatCompletion();
 
+        Console.WriteLine("PROCESS INVOKE");
         var context = await process.StartAsync(kernel, new KernelProcessEvent() { Id = "message" }, Guid.NewGuid().ToString());
 
-        Console.WriteLine("Done");
+        Console.WriteLine("PROCESS DONE");
     }
 
     /// <summary>

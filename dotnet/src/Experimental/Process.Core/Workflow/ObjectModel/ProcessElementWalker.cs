@@ -1,28 +1,29 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
+using System;
 using Microsoft.Bot.ObjectModel;
 using Microsoft.Bot.ObjectModel.Yaml;
-using Microsoft.PowerFx;
+using Microsoft.PowerFx.Types;
 
-namespace Microsoft.SemanticKernel;
+namespace Microsoft.SemanticKernel.Process.Workflows;
 
 internal sealed class ProcessActionWalker : BotElementWalker
 {
-    private readonly RecalcEngine _engine;
-    private readonly ProcessBuilder _processBuilder;
     private readonly ProcessActionVisitor _visitor;
 
-    public ProcessActionWalker(RecalcEngine engine, ProcessBuilder processBuilder)
+    public ProcessActionWalker(ProcessBuilder processBuilder, ProcessActionEnvironment processEnvironment)
     {
-        this._engine = engine;
-        this._processBuilder = processBuilder;
-        this._visitor = CreateActionVisitor(this._engine, this._processBuilder);
+        this._visitor = CreateActionVisitor(processBuilder, processEnvironment);
     }
 
     public void ProcessYaml(string yaml)
     {
+        Console.WriteLine("### PARSING YAML");
         var root = YamlSerializer.Deserialize<BotElement>(yaml) ?? throw new KernelException("Failed to deserialize YAML content into BotElement.");
+        Console.WriteLine("### INTERPRETING MODEL");
         this.Visit(root);
+        this._visitor.Complete();
+        Console.WriteLine("### PROCESS CREATED");
     }
 
     public override bool DefaultVisit(BotElement definition)
@@ -35,7 +36,7 @@ internal sealed class ProcessActionWalker : BotElementWalker
         return true;
     }
 
-    private static ProcessActionVisitor CreateActionVisitor(RecalcEngine engine, ProcessBuilder processBuilder) // %%% INTERNAL
+    private static ProcessActionVisitor CreateActionVisitor(ProcessBuilder processBuilder, ProcessActionEnvironment processEnvironment)
     {
         ProcessActionScopes scopes = new()
         {
@@ -44,18 +45,24 @@ internal sealed class ProcessActionWalker : BotElementWalker
             [ActionScopeTypes.System] = []
         };
 
-        var initStep = processBuilder.AddStep("init", async (kernal, context) =>
-        {
-            await context.SetUserStateAsync("scopes", scopes).ConfigureAwait(false);
-        });
+        scopes[ActionScopeTypes.System]["LastMessage"] = StringValue.New("ANYTHING"); // %%% INPUT MESSAGE ??? (NOT WORKING)
+
+        ProcessStepBuilder initStep =
+            processBuilder.AddStep(
+                "init",
+                async (kernal, context) =>
+                {
+                    Console.WriteLine("!!! INIT WORKFLOW");
+                    await context.SetUserStateAsync("scopes", scopes).ConfigureAwait(false);
+                });
 
         processBuilder.OnInputEvent("message").SendEventTo(new ProcessFunctionTargetBuilder(initStep));
 
-        ProcessActionStepContext context = new()
+        ProcessActionStepContext context = new("root")
         {
             EdgeBuilder = initStep.OnFunctionResult("Invoke")
         };
 
-        return new ProcessActionVisitor(engine, processBuilder, context);
+        return new ProcessActionVisitor(processBuilder, context, processEnvironment);
     }
 }

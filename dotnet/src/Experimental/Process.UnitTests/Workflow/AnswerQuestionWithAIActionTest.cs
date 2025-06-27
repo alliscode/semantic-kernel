@@ -1,0 +1,20 @@
+﻿// Copyright (c) Microsoft. All rights reserved.
+
+using System.Threading.Tasks;
+using Microsoft.Bot.ObjectModel;
+using Xunit;
+
+namespace Microsoft.SemanticKernel.Process.UnitTests.Workflow;
+
+/// <summary>
+/// Base for directly testing AnswerQuestionWithAI.
+/// </summary>
+public sealed class AnswerQuestionWithAIActionTest
+{
+    [Fact]
+    public Task EmptyTestAsync()
+    {
+        AnswerQuestionWithAI action = new AnswerQuestionWithAI();
+        return Task.CompletedTask;
+    }
+}
