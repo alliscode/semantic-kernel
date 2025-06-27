@@ -17,6 +17,7 @@ internal static class RecalcEngineExtensions
 
         // Rebuild scope record and update engine
         RecordValue scopeRecord = scope.BuildRecord();
+        engine.DeleteFormula(scopeName);
         engine.UpdateVariable(scopeName, scopeRecord);
     }
 
@@ -24,19 +25,29 @@ internal static class RecalcEngineExtensions
     {
         ProcessActionScopes scopes = await context.GetUserStateAsync<ProcessActionScopes>("scopes").ConfigureAwait(false);
 
+        SetScope(ActionScopeTypes.Topic);
+        SetScope(ActionScopeTypes.Global);
+        SetScope(ActionScopeTypes.System);
+
         foreach (ProcessAction action in actions)
         {
-            // Execute each action in the current context
-            Console.WriteLine($"!!! ACTION [{action.Id}]"); // %%% DEBUG
-            await action.HandleAsync(context, scopes, engine, kernel).ConfigureAwait(false);
+            try
+            {
+                // Execute each action in the current context
+                Console.WriteLine($"!!! ACTION [{action.Id}]"); // %%% DEBUG
+                await action.HandleAsync(context, scopes, engine, kernel).ConfigureAwait(false);
+            }
+            catch (Exception exception)
+            {
+                Console.WriteLine($"*** ACTION [{action.Id}] ERROR\n{exception.Message}"); // %%% DEBUG
+                throw new ProcessActionException($"Unexpected failure executing action #{action.Id} [{action.GetType().Name}]", exception);
+            }
+        }
 
-            RecordValue record1 = scopes[ActionScopeTypes.Topic].BuildRecord();
-            engine.UpdateVariable(ActionScopeTypes.Topic, record1);
-            // %%% OTHER SCOPE TYPES ???
-            RecordValue record2 = scopes[ActionScopeTypes.Global].BuildRecord();
-            engine.UpdateVariable(ActionScopeTypes.Global, record2);
-            RecordValue record3 = scopes[ActionScopeTypes.System].BuildRecord();
-            engine.UpdateVariable(ActionScopeTypes.System, record3);
+        void SetScope(string scopeName)
+        {
+            RecordValue record = scopes[scopeName].BuildRecord();
+            engine.UpdateVariable(scopeName, record);
         }
     }
 }

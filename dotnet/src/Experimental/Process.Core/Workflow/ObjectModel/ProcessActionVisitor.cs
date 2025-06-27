@@ -25,7 +25,7 @@ internal sealed class ProcessActionVisitor : DialogActionVisitor
                 (kernel, context) =>
                 {
                     // Handle unhandled errors here
-                    Console.WriteLine("Unhandled error occurred in the process.");
+                    Console.WriteLine("*** PROCESS ERROR - Unhandled error");
                     return Task.CompletedTask;
                 });
     }
@@ -41,7 +41,7 @@ internal sealed class ProcessActionVisitor : DialogActionVisitor
 
     protected override void Visit(ActionScope item)
     {
-        Trace(item);
+        Trace(item, isSkipped: false);
 
         this.MoveToNewContext(item.Id.Value);
     }
@@ -198,7 +198,7 @@ internal sealed class ProcessActionVisitor : DialogActionVisitor
 
     protected override void Visit(ConditionGroup item)
     {
-        Trace(item);
+        Trace(item, isSkipped: false);
 
         foreach (var condition in item.Conditions)
         {
@@ -219,7 +219,7 @@ internal sealed class ProcessActionVisitor : DialogActionVisitor
 
     protected override void Visit(SendActivity item)
     {
-        Trace(item);
+        Trace(item, isSkipped: false);
 
         this.AddAction(new SendActivityAction(item, this._environment));
     }
@@ -241,9 +241,9 @@ internal sealed class ProcessActionVisitor : DialogActionVisitor
 
     protected override void Visit(SetVariable item)
     {
-        Trace(item);
+        Trace(item, isSkipped: false);
 
-        this.AddAction(SetVariableAction.From(item));
+        this.AddAction(new SetVariableAction(item));
     }
 
     protected override void Visit(SetTextVariable item)
@@ -298,9 +298,9 @@ internal sealed class ProcessActionVisitor : DialogActionVisitor
 
     protected override void Visit(AnswerQuestionWithAI item)
     {
-        Trace(item);
+        Trace(item, isSkipped: false);
 
-        this.AddAction(AnswerQuestionWithAIAction.From(item));
+        this.AddAction(new AnswerQuestionWithAIAction(item));
     }
 
     protected override void Visit(InvokeCustomModelAction item)
@@ -308,9 +308,9 @@ internal sealed class ProcessActionVisitor : DialogActionVisitor
         Trace(item);
     }
 
-    private static void Trace(DialogAction item)
+    private static void Trace(DialogAction item, bool isSkipped = true)
     {
-        Console.WriteLine($"> VISIT - {item.GetType().Name} [{item.Id.Value}]"); // %%% TELEMETRY
+        Console.WriteLine($"> {(isSkipped ? "EMPTY" : "VISIT")} - {item.GetType().Name} [{item.Id.Value}]"); // %%% TELEMETRY
     }
 
     private void AddAction(ProcessAction? action)
@@ -344,9 +344,14 @@ internal sealed class ProcessActionVisitor : DialogActionVisitor
                             await engine.ExecuteActionsAsync(context, currentContext.Actions, kernel).ConfigureAwait(false);
                         }
                     }
+                    catch (ProcessActionException)
+                    {
+                        Console.WriteLine($"*** STEP [{currentContext.Id}] ERROR - Action failure"); // %%% DEBUG
+                        throw;
+                    }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"!!! ERROR [{currentContext.Id}] {ex.Message}"); // %%% DEBUG
+                        Console.WriteLine($"*** STEP [{currentContext.Id}] ERROR\n{ex.Message}"); // %%% DEBUG
                         throw;
                     }
                 });
