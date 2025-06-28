@@ -2,7 +2,7 @@
 
 using System.Collections.Generic;
 using Microsoft.PowerFx;
-using Microsoft.SemanticKernel.Process.Workflows;
+using Microsoft.SemanticKernel.Process.Workflows.ObjectModel.PowerFx;
 using Xunit;
 
 namespace Microsoft.SemanticKernel.Process.UnitTests.Workflow;

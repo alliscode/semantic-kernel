@@ -5,9 +5,9 @@ using System;
 namespace Microsoft.SemanticKernel.Process.Workflows;
 
 /// <summary>
-/// Defines an exception that's thrown when an operation on an <see cref="ProcessAction"/> fails, such as creating or deleting the thread.
+/// %%% COMMENT
 /// </summary>
-public sealed class ProcessActionException : Exception
+public class ProcessActionException : KernelException
 {
     /// <summary>
     /// Initializes a new instance of the <see cref="ProcessActionException"/> class.

@@ -3,7 +3,7 @@
 using System;
 using Microsoft.PowerFx;
 using Microsoft.PowerFx.Types;
-using Microsoft.SemanticKernel.Process.Workflows;
+using Microsoft.SemanticKernel.Process.Workflows.ObjectModel.PowerFx;
 using Xunit;
 
 namespace Microsoft.SemanticKernel.Process.UnitTests.Workflow;
@@ -44,15 +44,12 @@ public sealed class RecalcEngineTests
     [Fact]
     public void EvaluateFormula()
     {
-        RecordType recordType = RecordType.Empty();
-        recordType = recordType.Add("Label", FormulaType.String);
-        recordType = recordType.Add("Value", FormulaType.Decimal);
         NamedValue[] recordValues =
             [
                 new NamedValue("Label", StringValue.New("Test")),
                 new NamedValue("Value", DecimalValue.New(54)),
             ];
-        FormulaValue complexValue = FormulaValue.NewRecordFromFields(recordType, recordValues);
+        FormulaValue complexValue = FormulaValue.NewRecordFromFields(recordValues);
         this._engine.UpdateVariable("CustomLabel", StringValue.New("Note"));
         this._engine.UpdateVariable("CustomValue", DecimalValue.New(42));
         this._engine.UpdateVariable("Scoped", complexValue);

@@ -2,15 +2,16 @@
 
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.PowerFx;
 using Microsoft.PowerFx.Types;
 
-namespace Microsoft.SemanticKernel.Process.Workflows;
+namespace Microsoft.SemanticKernel.Process.Workflows.PowerFx;
 
 internal static class RecalcEngineExtensions
 {
-    public static void SetScopedVariable(this RecalcEngine engine, ProcessActionScopes scopes, string? scopeName, string? varName, FormulaValue value)
+    public static void SetScopedVariable(this RecalcEngine engine, ProcessActionScopes scopes, string scopeName, string varName, FormulaValue value)
     {
         // Validate inputs and assign value.
         ProcessActionScope scope = scopes.AssignValue(scopeName, varName, value);
@@ -21,7 +22,7 @@ internal static class RecalcEngineExtensions
         engine.UpdateVariable(scopeName, scopeRecord);
     }
 
-    public static async Task ExecuteActionsAsync(this RecalcEngine engine, KernelProcessStepContext context, IEnumerable<ProcessAction> actions, Kernel kernel)
+    public static async Task ExecuteActionsAsync(this RecalcEngine engine, KernelProcessStepContext context, IEnumerable<ProcessAction> actions, Kernel kernel, CancellationToken cancellationToken)
     {
         ProcessActionScopes scopes = await context.GetUserStateAsync<ProcessActionScopes>("scopes").ConfigureAwait(false);
 
@@ -31,15 +32,22 @@ internal static class RecalcEngineExtensions
 
         foreach (ProcessAction action in actions)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             try
             {
                 // Execute each action in the current context
-                Console.WriteLine($"!!! ACTION [{action.Id}]"); // %%% DEBUG
-                await action.HandleAsync(context, scopes, engine, kernel).ConfigureAwait(false);
+                Console.WriteLine($"!!! ACTION {action.GetType().Name} [{action.Id}]"); // %%% DEVTRACE
+                await action.HandleAsync(context, scopes, engine, kernel, cancellationToken).ConfigureAwait(false);
+            }
+            catch (ProcessActionException exception)
+            {
+                Console.WriteLine($"*** ACTION [{action.Id}] ERROR - {exception.GetType().Name}\n{exception.Message}"); // %%% DEVTRACE
+                throw;
             }
             catch (Exception exception)
             {
-                Console.WriteLine($"*** ACTION [{action.Id}] ERROR\n{exception.Message}"); // %%% DEBUG
+                Console.WriteLine($"*** ACTION [{action.Id}] ERROR - {exception.GetType().Name}\n{exception.Message}"); // %%% DEVTRACE
                 throw new ProcessActionException($"Unexpected failure executing action #{action.Id} [{action.GetType().Name}]", exception);
             }
         }

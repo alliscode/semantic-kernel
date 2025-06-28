@@ -1,10 +1,12 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Bot.ObjectModel;
 using Microsoft.PowerFx;
 using Microsoft.PowerFx.Types;
+using Microsoft.SemanticKernel.Process.Workflows.PowerFx;
 
 namespace Microsoft.SemanticKernel.Process.Workflows;
 
@@ -19,7 +21,7 @@ internal abstract class ProcessAction(DialogAction action)
 
     public DialogAction Action => action;
 
-    public abstract Task HandleAsync(KernelProcessStepContext context, ProcessActionScopes scopes, RecalcEngine engine, Kernel kernel);
+    public abstract Task HandleAsync(KernelProcessStepContext context, ProcessActionScopes scopes, RecalcEngine engine, Kernel kernel, CancellationToken cancellationToken);
 }
 
 internal abstract class AssignmentAction<TAction> : ProcessAction<TAction> where TAction : DialogAction
@@ -29,14 +31,30 @@ internal abstract class AssignmentAction<TAction> : ProcessAction<TAction> where
     {
         this.Target =
             resolver.Invoke() ??
-            throw new KernelException("SetVariable action must have a variable path defined."); // %%% EXCEPTION TYPES;
+            throw new InvalidActionException($"Action '{action.GetType().Name}' must have a variable path defined.");
+
+        if (string.IsNullOrWhiteSpace(this.Target.VariableScopeName))
+        {
+            throw new InvalidActionException($"Action '{action.GetType().Name}' must define a variable scope.");
+        }
+        if (string.IsNullOrWhiteSpace(this.Target.VariableName))
+        {
+            throw new InvalidActionException($"Action '{action.GetType().Name}' must define a variable name.");
+        }
     }
 
     public PropertyPath Target { get; }
 
     protected void AssignTarget(RecalcEngine engine, ProcessActionScopes scopes, FormulaValue result)
     {
-        Console.WriteLine($"!!! {this.GetType().Name} [{this.Id}] {this.Target.VariableScopeName}.{this.Target.VariableName}={result}"); // %%% DEBUG
-        engine.SetScopedVariable(scopes, this.Target.VariableScopeName, this.Target.VariableName, result);
+        engine.SetScopedVariable(scopes, this.Target.VariableScopeName!, this.Target.VariableName!, result);
+        string? resultValue = result.Format();
+        string valuePosition = (resultValue?.IndexOf('\n') ?? -1) >= 0 ? Environment.NewLine : " ";
+        Console.WriteLine( // %%% DEVTRACE
+            $"""
+            !!! ASSIGN {this.GetType().Name} [{this.Id}]
+            \tNAME: {this.Target.VariableScopeName}.{this.Target.VariableName}
+            \tVALUE:{valuePosition}{result.Format()}
+            """);
     }
 }

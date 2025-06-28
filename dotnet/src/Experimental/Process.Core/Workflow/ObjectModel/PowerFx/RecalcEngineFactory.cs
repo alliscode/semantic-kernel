@@ -2,7 +2,7 @@
 
 using Microsoft.PowerFx;
 
-namespace Microsoft.SemanticKernel.Process.Workflows;
+namespace Microsoft.SemanticKernel.Process.Workflows.PowerFx;
 
 internal static class RecalcEngineFactory
 {

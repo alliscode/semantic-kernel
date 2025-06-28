@@ -19,7 +19,7 @@ internal sealed class ProcessActionWalker : BotElementWalker
     public void ProcessYaml(string yaml)
     {
         Console.WriteLine("### PARSING YAML");
-        var root = YamlSerializer.Deserialize<BotElement>(yaml) ?? throw new KernelException("Failed to deserialize YAML content into BotElement.");
+        BotElement root = YamlSerializer.Deserialize<BotElement>(yaml) ?? throw new KernelException("Unable to parse YAML content.");
         Console.WriteLine("### INTERPRETING MODEL");
         this.Visit(root);
         this._visitor.Complete();
@@ -45,7 +45,9 @@ internal sealed class ProcessActionWalker : BotElementWalker
             [ActionScopeTypes.System] = []
         };
 
-        scopes[ActionScopeTypes.System]["LastMessage"] = StringValue.New("ANYTHING"); // %%% INPUT MESSAGE ??? (NOT WORKING)
+        // %%% INPUT MESSAGE
+        FormulaValue inputTask = FormulaValue.NewRecordFromFields([new NamedValue("Text", StringValue.New("Why is the sky blue?"))]);
+        scopes[ActionScopeTypes.System]["LastMessage"] = inputTask;
 
         ProcessStepBuilder initStep =
             processBuilder.AddStep(

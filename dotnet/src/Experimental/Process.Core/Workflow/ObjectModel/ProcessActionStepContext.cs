@@ -43,35 +43,22 @@ internal static class ProcessActionScopeExtensions
 {
     public static RecordValue BuildRecord(this ProcessActionScope scope)
     {
-        RecordType recordType = RecordType.Empty();
+        return FormulaValue.NewRecordFromFields(GetFields());
 
-        int index = 0;
-        NamedValue[] namedValues = new NamedValue[scope.Count];
-        foreach (KeyValuePair<string, FormulaValue> kvp in scope)
+        IEnumerable<NamedValue> GetFields()
         {
-            recordType = recordType.Add(kvp.Key, kvp.Value.Type);
-            namedValues[index] = new NamedValue(kvp.Key, kvp.Value);
-            ++index;
+            foreach (KeyValuePair<string, FormulaValue> kvp in scope)
+            {
+                yield return new NamedValue(kvp.Key, kvp.Value);
+            }
         }
-
-        return FormulaValue.NewRecordFromFields(recordType, namedValues);
     }
 
-    public static ProcessActionScope AssignValue(this ProcessActionScopes scopes, string? scopeName, string? varName, FormulaValue value)
+    public static ProcessActionScope AssignValue(this ProcessActionScopes scopes, string scopeName, string varName, FormulaValue value)
     {
-        if (scopeName is null)
-        {
-            throw new InvalidOperationException("Scope name cannot be null.");
-        }
-
-        if (varName is null)
-        {
-            throw new InvalidOperationException("Variable name cannot be null.");
-        }
-
         if (!scopes.TryGetValue(scopeName, out ProcessActionScope? scope))
         {
-            throw new InvalidOperationException("Unknown scope: " + scopeName);
+            throw new InvalidActionException("Unknown scope: " + scopeName);
         }
 
         scope[varName] = value;

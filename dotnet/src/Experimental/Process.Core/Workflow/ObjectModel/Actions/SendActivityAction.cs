@@ -1,6 +1,6 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
-using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Bot.ObjectModel;
 using Microsoft.PowerFx;
@@ -16,16 +16,14 @@ internal sealed class SendActivityAction : ProcessAction<SendActivity>
     {
         if (source.Activity is null)
         {
-            throw new KernelException("SendActivity action must have an activity defined."); // %%% EXCEPTION TYPES
+            throw new InvalidActionException($"{nameof(SendActivity)} action must have an activity defined.");
         }
 
         this._environment = environment;
     }
 
-    public override async Task HandleAsync(KernelProcessStepContext context, ProcessActionScopes scopes, RecalcEngine engine, Kernel kernel)
+    public override async Task HandleAsync(KernelProcessStepContext context, ProcessActionScopes scopes, RecalcEngine engine, Kernel kernel, CancellationToken cancellationToken)
     {
-        Console.WriteLine($"!!! {nameof(SendActivityAction)} [{this.Id}]");
-
-        await this._environment.ActivityNotificationHandler(this.Action.Activity!).ConfigureAwait(false); // %%% NULL OVERRIDE
+        await this._environment.ActivityNotificationHandler(this.Action.Activity!, engine).ConfigureAwait(false); // %%% NULL OVERRIDE
     }
 }

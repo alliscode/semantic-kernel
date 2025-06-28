@@ -1,6 +1,6 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
-using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Bot.ObjectModel;
 using Microsoft.PowerFx;
@@ -18,18 +18,13 @@ internal sealed class SetVariableAction : AssignmentAction<SetVariable>
         this._expression = action.Value?.ExpressionText ?? string.Empty;
     }
 
-    public override Task HandleAsync(KernelProcessStepContext context, ProcessActionScopes scopes, RecalcEngine engine, Kernel kernel)
+    public override Task HandleAsync(KernelProcessStepContext context, ProcessActionScopes scopes, RecalcEngine engine, Kernel kernel, CancellationToken cancellationToken)
     {
         FormulaValue result = engine.Eval(this._expression);
 
-        if (this.Target.VariableName == "NewTask") // %%% SYSTEM SCOPE
-        {
-            result = StringValue.New("HOW MANY LICKS DOES IT TAKE?");
-        }
-
         if (result is ErrorValue errorVal)
         {
-            throw new InvalidOperationException("PowerFX error: " + errorVal.Errors[0].Message); // %%% EXCEPTION TYPES
+            throw new ProcessActionException($"Unable to evaluate expression: {this._expression}.  Error: {errorVal.Errors[0].Message}");
         }
 
         this.AssignTarget(engine, scopes, result);
