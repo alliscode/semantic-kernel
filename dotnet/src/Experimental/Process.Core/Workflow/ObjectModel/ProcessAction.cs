@@ -53,8 +53,8 @@ internal abstract class AssignmentAction<TAction> : ProcessAction<TAction> where
         Console.WriteLine( // %%% DEVTRACE
             $"""
             !!! ASSIGN {this.GetType().Name} [{this.Id}]
-            \tNAME: {this.Target.VariableScopeName}.{this.Target.VariableName}
-            \tVALUE:{valuePosition}{result.Format()}
+                NAME: {this.Target.VariableScopeName}.{this.Target.VariableName}
+                VALUE:{valuePosition}{result.Format()}
             """);
     }
 }

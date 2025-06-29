@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Bot.ObjectModel;
 using Microsoft.PowerFx;
 using Microsoft.PowerFx.Types;
 
@@ -57,5 +58,31 @@ internal static class RecalcEngineExtensions
             RecordValue record = scopes[scopeName].BuildRecord();
             engine.UpdateVariable(scopeName, record);
         }
+    }
+
+    public static FormulaValue EvaluteExpression(this RecalcEngine engine, ValueExpression? value)
+    {
+        if (value is null)
+        {
+            return BlankValue.NewBlank(); // %%% HANDLE NULL CASE
+        }
+
+        if (value.IsVariableReference)
+        {
+            return engine.Eval($"{value.VariableReference!.VariableScopeName}.{value.VariableReference!.VariableName}"); // %%% DRY
+        }
+
+        if (value.IsExpression)
+        {
+            return engine.Eval(value.ExpressionText);
+        }
+
+        if (value.IsLiteral)
+        {
+            DataValue? source = value.LiteralValue; // %%% TODO: TRANSLATE VALUE
+            return BlankValue.NewBlank(); // %%% HACK
+        }
+        // %%% TODO: value.StructuredRecordExpression ???
+        return BlankValue.NewBlank();
     }
 }

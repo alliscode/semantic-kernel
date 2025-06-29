@@ -46,7 +46,8 @@ internal sealed class ProcessActionWalker : BotElementWalker
         };
 
         // %%% INPUT MESSAGE
-        FormulaValue inputTask = FormulaValue.NewRecordFromFields([new NamedValue("Text", StringValue.New("Why is the sky blue?"))]);
+        //FormulaValue inputTask = FormulaValue.NewRecordFromFields([new NamedValue("Text", StringValue.New("Why is the sky blue?"))]);
+        FormulaValue inputTask = StringValue.New("Why is the sky blue?");
         scopes[ActionScopeTypes.System]["LastMessage"] = inputTask;
 
         ProcessStepBuilder initStep =
@@ -60,11 +61,6 @@ internal sealed class ProcessActionWalker : BotElementWalker
 
         processBuilder.OnInputEvent("message").SendEventTo(new ProcessFunctionTargetBuilder(initStep));
 
-        ProcessActionStepContext context = new("root")
-        {
-            EdgeBuilder = initStep.OnFunctionResult("Invoke")
-        };
-
-        return new ProcessActionVisitor(processBuilder, context, processEnvironment);
+        return new ProcessActionVisitor(processBuilder, processEnvironment, initStep);
     }
 }

@@ -45,11 +45,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Remove="Step06\deepResearch.yaml" />
-    <None Remove="Step06\DeepResearchAgent.fdl" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\..\src\Agents\AzureAI\Agents.AzureAI.csproj" />
     <ProjectReference Include="..\..\src\Agents\Core\Agents.Core.csproj" />
     <ProjectReference Include="..\..\src\Agents\OpenAI\Agents.OpenAI.csproj" />
@@ -67,23 +62,23 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Remove="Step06\deepResearch.yaml" />
+    <None Remove="Step06\DeepResearchAgent.fdl" />
+  </ItemGroup>
+
+  <ItemGroup>
     <EmbeddedResource Include="$(RepoRoot)/dotnet/samples/LearnResources/Resources/Grimms-The-King-of-the-Golden-Mountain.txt" Link="%(RecursiveDir)Resources/%(Filename)%(Extension)" />
     <EmbeddedResource Include="$(RepoRoot)/dotnet/samples/LearnResources/Resources/Grimms-The-Water-of-Life.txt" Link="%(RecursiveDir)Resources/%(Filename)%(Extension)" />
     <EmbeddedResource Include="$(RepoRoot)/dotnet/samples/LearnResources/Resources/Grimms-The-White-Snake.txt" Link="%(RecursiveDir)Resources/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Step06\conditionalTest.yaml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </EmbeddedResource>
     <EmbeddedResource Include="Step06\deepResearch.yaml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </EmbeddedResource>
     <EmbeddedResource Include="Step06\DeepResearchAgent.fdl">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </EmbeddedResource>
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Step03\States\FriedFishSuccess\" />
-    <Folder Include="Step03\States\FriedFishSuccessLowStock\" />
-    <Folder Include="Step03\States\FriedFishSuccessNoStock\" />
-    <Folder Include="Step03\States\FishSandwichSuccessLowStock\" />
-    <Folder Include="Step03\States\FishSandwichSuccess\" />
   </ItemGroup>
 
 </Project>

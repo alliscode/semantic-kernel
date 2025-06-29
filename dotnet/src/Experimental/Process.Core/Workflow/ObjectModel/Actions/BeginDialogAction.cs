@@ -16,6 +16,7 @@ internal sealed class BeginDialogAction : ProcessAction<BeginDialog>
 
     public override Task HandleAsync(KernelProcessStepContext context, ProcessActionScopes scopes, RecalcEngine engine, Kernel kernel, CancellationToken cancellationToken)
     {
+        // %%% TODO
         return Task.CompletedTask;
     }
 }

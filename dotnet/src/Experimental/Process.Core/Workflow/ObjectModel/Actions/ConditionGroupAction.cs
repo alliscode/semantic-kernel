@@ -7,15 +7,23 @@ using Microsoft.PowerFx;
 
 namespace Microsoft.SemanticKernel.Process.Workflows.Actions;
 
-internal sealed class GotoActionAction : ProcessAction<GotoAction> // %%% NEEDED ???
+internal sealed class ConditionGroupAction : ProcessAction<ConditionGroup>
 {
-    public GotoActionAction(GotoAction source)
+    public ConditionGroupAction(ConditionGroup source)
         : base(source)
     {
     }
 
     public override Task HandleAsync(KernelProcessStepContext context, ProcessActionScopes scopes, RecalcEngine engine, Kernel kernel, CancellationToken cancellationToken)
     {
+        foreach (ConditionItem condition in this.Action.Conditions)
+        {
+            if (engine.Eval(condition.Condition?.ExpressionText ?? "true").AsBoolean())
+            {
+                // %%% VERIFY IF ONLY ONE CONDITION IS EXPECTED / ALLOWED
+
+            }
+        }
         return Task.CompletedTask;
     }
 }

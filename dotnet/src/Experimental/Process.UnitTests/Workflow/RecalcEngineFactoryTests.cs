@@ -2,10 +2,10 @@
 
 using System.Collections.Generic;
 using Microsoft.PowerFx;
-using Microsoft.SemanticKernel.Process.Workflows.ObjectModel.PowerFx;
+using Microsoft.SemanticKernel.Process.Workflows.PowerFx;
 using Xunit;
 
-namespace Microsoft.SemanticKernel.Process.UnitTests.Workflow;
+namespace Microsoft.SemanticKernel.Process.UnitTests.Workflows;
 
 public class RecalcEngineFactoryTests
 {

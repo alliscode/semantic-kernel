@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using Microsoft.Bot.ObjectModel;
 using Xunit;
 
-namespace Microsoft.SemanticKernel.Process.UnitTests.Workflow;
+namespace Microsoft.SemanticKernel.Process.UnitTests.Workflows;
 
 /// <summary>
 /// Base for directly testing AnswerQuestionWithAI.

@@ -5,26 +5,28 @@ using System.Threading.Tasks;
 using Microsoft.Bot.ObjectModel;
 using Microsoft.PowerFx;
 using Microsoft.PowerFx.Types;
+using Microsoft.SemanticKernel.Process.Workflows.PowerFx;
 
 namespace Microsoft.SemanticKernel.Process.Workflows.Actions;
 
 internal sealed class SetVariableAction : AssignmentAction<SetVariable>
 {
-    private readonly string _expression;
-
     public SetVariableAction(SetVariable action)
         : base(action, () => action.Variable?.Path)
     {
-        this._expression = action.Value?.ExpressionText ?? string.Empty;
+        if (this.Action.Value is null)
+        {
+            throw new InvalidActionException($"{nameof(ParseValue)} must define {nameof(ParseValue.Value)}");
+        }
     }
 
     public override Task HandleAsync(KernelProcessStepContext context, ProcessActionScopes scopes, RecalcEngine engine, Kernel kernel, CancellationToken cancellationToken)
     {
-        FormulaValue result = engine.Eval(this._expression);
+        FormulaValue result = engine.EvaluteExpression(this.Action.Value!);
 
-        if (result is ErrorValue errorVal)
+        if (result is ErrorValue errorVal) // %%% APPLY EVERYWHERE (OR CENTRAL)
         {
-            throw new ProcessActionException($"Unable to evaluate expression: {this._expression}.  Error: {errorVal.Errors[0].Message}");
+            throw new ProcessActionException($"Unable to evaluate expression.  Error: {errorVal.Errors[0].Message}");
         }
 
         this.AssignTarget(engine, scopes, result);

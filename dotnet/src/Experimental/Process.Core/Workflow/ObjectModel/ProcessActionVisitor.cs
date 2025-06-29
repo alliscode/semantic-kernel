@@ -15,14 +15,23 @@ internal sealed class ProcessActionVisitor : DialogActionVisitor
     private readonly ProcessBuilder _processBuilder;
     private readonly ProcessStepBuilder _unhandledErrorStep;
     private readonly ProcessActionEnvironment _environment;
-    private readonly Dictionary<ActionId, ProcessAction> _actions;
+    private readonly Dictionary<ActionId, ProcessStepBuilder> _steps;
+    private readonly Stack<ProcessActionStepContext> _contextStack;
+    private readonly List<(ActionId TargetId, ProcessStepEdgeBuilder SourceEdge)> _linkCache;
 
-    public ProcessActionVisitor(ProcessBuilder processBuilder, ProcessActionStepContext currentContext, ProcessActionEnvironment environment)
+    public ProcessActionVisitor(ProcessBuilder processBuilder, ProcessActionEnvironment environment, ProcessStepBuilder sourceStep)
     {
-        this._actions = [];
+        ProcessActionStepContext rootContext =
+            new()
+            {
+                EdgeBuilder = sourceStep.OnFunctionResult("Invoke") // %%% DRY
+            };
+        this._contextStack = [];
+        this._contextStack.Push(rootContext);
+        this._steps = [];
+        this._linkCache = [];
         this._processBuilder = processBuilder;
         this._environment = environment;
-        this.CurrentContext = currentContext;
         this._unhandledErrorStep =
             processBuilder.AddStep(
                 "unhandled_error",
@@ -36,28 +45,53 @@ internal sealed class ProcessActionVisitor : DialogActionVisitor
 
     public void Complete()
     {
+        // Close the current context
+        this.CurrentContext.EdgeBuilder.StopProcess();
+
+        // Process the cached links
+        foreach ((ActionId targetId, ProcessStepEdgeBuilder sourceEdge) in this._linkCache)
+        {
+            // Link the queued context to the step
+            ProcessStepBuilder step = this._steps[targetId]; // %%% TRY
+            Console.WriteLine($"> CONNECTING {sourceEdge.Source.StepId} => {targetId}");
+            sourceEdge.SendEventTo(new ProcessFunctionTargetBuilder(step));
+        }
+        this._linkCache.Clear();
+
+        // Visitor is complete, all actions have been processed
         Console.WriteLine("> COMPLETE"); // %%% DEVTRACE
-        var finalContext = this.MoveToNewContext("final");
-        finalContext.EdgeBuilder.StopProcess();
     }
 
-    private ProcessActionStepContext CurrentContext { get; set; }
+    private ProcessActionStepContext CurrentContext => this._contextStack.Peek();
 
     protected override void Visit(ActionScope item)
     {
         Trace(item, isSkipped: false);
 
-        this.MoveToNewContext(item.Id.Value);
+        this.AddContainer(item.Id.Value);
     }
 
     protected override void Visit(ConditionGroup item)
     {
         Trace(item, isSkipped: false);
 
-        foreach (var condition in item.Conditions)
+        this.AddAction(new ConditionGroupAction(item));
+
+        // Visit each action in the condition group
+        int index = 1;
+        foreach (ConditionItem condition in item.Conditions)
         {
-            // Visit each action in the condition group
+            ProcessStepBuilder step = this.CreateContainerStep(this.CurrentContext, condition.Id ?? $"{item.Id.Value}_item{index}");
+            this._contextStack.Push(
+                new ProcessActionStepContext()
+                {
+                    EdgeBuilder = step.OnFunctionResult("Invoke") // %%% DRY
+                });
+
             condition.Accept(this);
+
+            this._contextStack.Pop();
+            ++index;
         }
     }
 
@@ -65,7 +99,11 @@ internal sealed class ProcessActionVisitor : DialogActionVisitor
     {
         Trace(item, isSkipped: false);
 
-        this.AddAction(new GotoActionAction(item));
+        this.AddContainer(item.Id.Value);
+        // Store the link for processing after all actions have steps.
+        this._linkCache.Add((item.ActionId, this.CurrentContext.EdgeBuilder));
+        // Create an orphaned context for continuity
+        this.AddDead(item.Id.Value);
     }
 
     protected override void Visit(EndConversation item)
@@ -73,6 +111,10 @@ internal sealed class ProcessActionVisitor : DialogActionVisitor
         Trace(item, isSkipped: false);
 
         this.AddAction(new EndConversationAction(item));
+        // Stop the process, this is a terminal action
+        this.CurrentContext.EdgeBuilder.StopProcess();
+        // Create an orphaned context for continuity
+        this.AddDead(item.Id.Value);
     }
 
     protected override void Visit(BeginDialog item)
@@ -136,6 +178,8 @@ internal sealed class ProcessActionVisitor : DialogActionVisitor
 
         this.AddAction(new SendActivityAction(item, this._environment));
     }
+
+    #region Not implemented
 
     protected override void Visit(GetActivityMembers item)
     {
@@ -322,71 +366,81 @@ internal sealed class ProcessActionVisitor : DialogActionVisitor
         Trace(item);
     }
 
+    #endregion
+
     private void AddAction(ProcessAction? action)
     {
         if (action is not null)
         {
             // Add the action to the existing context
-            this.CurrentContext.Actions.Add(action);
-            this._actions[action.Id] = action;
+            ProcessStepBuilder step = this.CreateActionStep(this.CurrentContext, action);
+            this._steps[action.Id] = step;
+            this.ContinueWith(step);
         }
     }
 
-    private ProcessActionStepContext MoveToNewContext(string contextId)
+    private void AddContainer(string contextId)
     {
-        ProcessStepBuilder step = this.CreateActionStep(this.CurrentContext, contextId);
-        return this.CreateNewContext(contextId, step);
+        ProcessStepBuilder step = this.CreateContainerStep(this.CurrentContext, contextId);
+        this.ContinueWith(step);
+    }
+
+    private void AddDead(string contextId)
+    {
+        ProcessStepBuilder step = this.CreateContainerStep(this.CurrentContext, $"dead_{contextId}");
+        this.CurrentContext.EdgeBuilder = step.OnFunctionResult("Invoke"); // %%% DRY
+    }
+
+    private ProcessStepBuilder CreateContainerStep(ProcessActionStepContext currentContext, string contextId)
+    {
+        return
+            this._processBuilder.AddStep(
+                contextId,
+                (kernel, context) =>
+                {
+                    Console.WriteLine($"!!! STEP [{contextId}]"); // %%% DEVTRACE
+                    return Task.CompletedTask;
+                });
     }
 
     // This implementation accepts the context as a parameter in order to pin the context closure.
     // The step cannot reference this.CurrentContext directly, as this will always be the final context.
-    private ProcessStepBuilder CreateActionStep(ProcessActionStepContext currentContext, string contextId)
+    private ProcessStepBuilder CreateActionStep(ProcessActionStepContext currentContext, ProcessAction action)
     {
-        // Creating a step to execute all the current actions
         return
             this._processBuilder.AddStep(
-                currentContext.Id,
+                action.Id.Value,
                 async (kernel, context) =>
                 {
                     try
                     {
-                        Console.WriteLine($"!!! STEP [{currentContext.Id}]"); // %%% DEVTRACE
-                        if (currentContext.Actions.Count > 0)
-                        {
-                            // %%% ACTIONS (N) => ACTION (1)
-                            RecalcEngine engine = RecalcEngineFactory.Create(this._environment.MaximumExpressionLength);
-                            await engine.ExecuteActionsAsync(context, currentContext.Actions, kernel, cancellationToken: default).ConfigureAwait(false);
-                        }
+                        Console.WriteLine($"!!! STEP [{action.Id}]"); // %%% DEVTRACE
+                        RecalcEngine engine = RecalcEngineFactory.Create(this._environment.MaximumExpressionLength);
+                        await engine.ExecuteActionsAsync(context, [action], kernel, cancellationToken: default).ConfigureAwait(false);
                     }
                     catch (ProcessActionException)
                     {
-                        Console.WriteLine($"*** STEP [{currentContext.Id}] ERROR - Action failure"); // %%% DEVTRACE
+                        Console.WriteLine($"*** STEP [{action.Id}] ERROR - Action failure"); // %%% DEVTRACE
                         throw;
                     }
                     catch (Exception exception)
                     {
-                        Console.WriteLine($"*** STEP [{currentContext.Id}] ERROR - {exception.GetType().Name}\n{exception.Message}"); // %%% DEVTRACE
+                        Console.WriteLine($"*** STEP [{action.Id}] ERROR - {exception.GetType().Name}\n{exception.Message}"); // %%% DEVTRACE
                         throw;
                     }
                 });
     }
 
-    private ProcessActionStepContext CreateNewContext(string contextId, ProcessStepBuilder newStep)
+    private void ContinueWith(ProcessStepBuilder newStep)
     {
-        // IN: Target the given step when the previous step ends
-        this.CurrentContext.EdgeBuilder.SendEventTo(new ProcessFunctionTargetBuilder(newStep));
-
         // ERROR: Capture unhandled errors for the given step
         newStep.OnFunctionError("Invoke").SendEventTo(new ProcessFunctionTargetBuilder(this._unhandledErrorStep));
 
-        // NEW: Define a context for the subsequent step
-        return
-            this.CurrentContext =
-                new ProcessActionStepContext(contextId)
-                {
-                    // OUT: Capture function result handler for susequent step
-                    EdgeBuilder = newStep.OnFunctionResult("Invoke")
-                };
+        // IN: Target the given step when the previous step ends
+        this.CurrentContext.EdgeBuilder.SendEventTo(new ProcessFunctionTargetBuilder(newStep));
+
+        // OUT: Capture function result handler for susequent step
+        this.CurrentContext.EdgeBuilder = newStep.OnFunctionResult("Invoke");
     }
 
     private static void Trace(DialogAction item, bool isSkipped = true)

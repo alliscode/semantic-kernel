@@ -7,7 +7,7 @@ using Microsoft.PowerFx;
 
 namespace Microsoft.SemanticKernel.Process.Workflows.Actions;
 
-internal sealed class EndConversationAction : ProcessAction<EndConversation> // %%% NEEDED ???
+internal sealed class EndConversationAction : ProcessAction<EndConversation>
 {
     public EndConversationAction(EndConversation source)
         : base(source)

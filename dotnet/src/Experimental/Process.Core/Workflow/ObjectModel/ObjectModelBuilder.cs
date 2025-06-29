@@ -10,7 +10,7 @@ namespace Microsoft.SemanticKernel;
 public sealed class ObjectModelBuilder
 {
     /// <summary>
-    /// %%% TODO: REVISIT PLACEHOLDER
+    /// %%% TODO: PLACEHOLDER: REVISIT
     /// </summary>
     public ProcessActionEnvironment Environment { get; init; } = ProcessActionEnvironment.Default;
 

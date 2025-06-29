@@ -24,6 +24,6 @@ internal sealed class SendActivityAction : ProcessAction<SendActivity>
 
     public override async Task HandleAsync(KernelProcessStepContext context, ProcessActionScopes scopes, RecalcEngine engine, Kernel kernel, CancellationToken cancellationToken)
     {
-        await this._environment.ActivityNotificationHandler(this.Action.Activity!, engine).ConfigureAwait(false); // %%% NULL OVERRIDE
+        await this._environment.ActivityNotificationHandler(this.Action.Activity!, engine).ConfigureAwait(false);
     }
 }

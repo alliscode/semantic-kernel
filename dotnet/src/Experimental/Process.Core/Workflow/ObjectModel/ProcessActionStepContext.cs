@@ -1,6 +1,5 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
-using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.PowerFx;
@@ -24,19 +23,12 @@ internal delegate Task ProcessActionHandler(KernelProcessStepContext context, Pr
 /// <summary>
 /// Step context for the current step in a process.
 /// </summary>
-internal sealed class ProcessActionStepContext(string id)
+internal sealed class ProcessActionStepContext
 {
-    public string Id => id;
-
     /// <summary>
     /// The edge builder for the current step.
     /// </summary>
-    public required ProcessStepEdgeBuilder EdgeBuilder { get; init; }
-
-    /// <summary>
-    /// The actions.
-    /// </summary>
-    public List<ProcessAction> Actions { get; init; } = [];
+    public required ProcessStepEdgeBuilder EdgeBuilder { get; set; }
 }
 
 internal static class ProcessActionScopeExtensions

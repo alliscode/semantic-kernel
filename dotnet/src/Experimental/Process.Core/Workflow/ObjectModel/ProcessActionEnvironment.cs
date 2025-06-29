@@ -35,7 +35,7 @@ public sealed class ProcessActionEnvironment
 
         if (activity is MessageActivityTemplate messageActivity)
         {
-            if (string.IsNullOrEmpty(messageActivity.Summary))
+            if (!string.IsNullOrEmpty(messageActivity.Summary))
             {
                 Console.WriteLine($"\t{messageActivity.Summary}"); // %%% DEVTRACE
             }

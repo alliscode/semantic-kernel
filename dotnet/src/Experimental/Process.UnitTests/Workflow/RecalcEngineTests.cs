@@ -3,10 +3,10 @@
 using System;
 using Microsoft.PowerFx;
 using Microsoft.PowerFx.Types;
-using Microsoft.SemanticKernel.Process.Workflows.ObjectModel.PowerFx;
+using Microsoft.SemanticKernel.Process.Workflows.PowerFx;
 using Xunit;
 
-namespace Microsoft.SemanticKernel.Process.UnitTests.Workflow;
+namespace Microsoft.SemanticKernel.Process.UnitTests.Workflows;
 
 #pragma warning disable CA1308 // Ignore "Normalize strings to uppercase" warning for test cases
 
