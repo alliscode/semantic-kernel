@@ -43,6 +43,7 @@ internal class LocalStep : IKernelProcessMessageChannel, IKernelProcessUserState
     /// <param name="kernel">Required. An instance of <see cref="Kernel"/>.</param>
     /// <param name="parentProcessId">Optional. The Id of the parent process if one exists.</param>
     /// <param name="instanceId">Optional: Id of the process if given</param>
+    /// <param name="userStateStore"></param>
     public LocalStep(KernelProcessStepInfo stepInfo, Kernel kernel, string? parentProcessId = null, string? instanceId = null, LocalUserStateStore? userStateStore = null)
     {
         Verify.NotNull(kernel, nameof(kernel));
@@ -267,7 +268,7 @@ internal class LocalStep : IKernelProcessMessageChannel, IKernelProcessUserState
         }
 
         // If we're still waiting for inputs on all of our functions then don't do anything.
-        List<string> invocableFunctions = this._inputs.Where(i => i.Value != null && i.Value.All(v => v.Value != null)).Select(i => i.Key).ToList();
+        List<string> invocableFunctions = [.. this._inputs.Where(i => i.Value != null && i.Value.All(v => v.Value != null)).Select(i => i.Key)];
         var missingKeys = this._inputs.Where(i => i.Value is null || i.Value.Any(v => v.Value is null));
 
         if (invocableFunctions.Count == 0)

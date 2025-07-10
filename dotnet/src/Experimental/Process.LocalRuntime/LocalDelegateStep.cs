@@ -14,7 +14,7 @@ internal class LocalDelegateStep : LocalStep
 
     internal override KernelProcessStep CreateStepInstance()
     {
-        var delegateStep = this._stepInfo as KernelProcessDelegateStepInfo;
+        var delegateStep = (KernelProcessDelegateStepInfo)this._stepInfo;
         return new KernelDelegateProcessStep(delegateStep.StepFunction);
     }
 }

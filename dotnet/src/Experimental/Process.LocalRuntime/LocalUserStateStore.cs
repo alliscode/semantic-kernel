@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace Microsoft.SemanticKernel.Process;
+
 internal class LocalUserStateStore
 {
     private readonly Dictionary<string, object> _userState = [];
@@ -22,7 +23,7 @@ internal class LocalUserStateStore
             return Task.FromResult(typedValue);
         }
 
-        return Task.FromResult<T>(null);
+        return Task.FromResult<T>(null!); // HACK
     }
 
     /// <summary>

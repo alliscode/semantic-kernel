@@ -36,7 +36,7 @@ internal sealed class LocalProcess : LocalStep, System.IAsyncDisposable
     private JoinableTask? _processTask;
     private CancellationTokenSource? _processCancelSource;
     private ProcessStateManager? _processStateManager;
-    private LocalUserStateStore _userStateStore;
+    private readonly LocalUserStateStore _userStateStore;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="LocalProcess"/> class.
@@ -49,7 +49,7 @@ internal sealed class LocalProcess : LocalStep, System.IAsyncDisposable
     {
         Verify.NotNull(process.Steps);
 
-        this._stepsInfos = new List<KernelProcessStepInfo>(process.Steps);
+        this._stepsInfos = [.. process.Steps];
         this._process = process;
         this._initializeTask = new Lazy<ValueTask>(this.InitializeProcessAsync);
         this._externalEventChannel = Channel.CreateUnbounded<KernelProcessEvent>();
@@ -215,7 +215,7 @@ internal sealed class LocalProcess : LocalStep, System.IAsyncDisposable
         if (this.StorageManager != null && !string.IsNullOrEmpty(this._stepInfo.State.RunId))
         {
             var storageKeyValues = this.GetStepStorageKeyValues();
-            var updatedProcess = this._process with { State = this._stepState, Steps = this._steps.Select(step => step._stepInfo).ToList() };
+            var updatedProcess = this._process with { State = this._stepState, Steps = [.. this._steps.Select(step => step._stepInfo)] };
             await this.StorageManager.SaveProcessDataAsync(storageKeyValues.Item1, storageKeyValues.Item2, updatedProcess).ConfigureAwait(false);
             if (saveChildrenState)
             {
@@ -480,7 +480,7 @@ internal sealed class LocalProcess : LocalStep, System.IAsyncDisposable
             }
 
             // Check if the condition is met for this edge, if not skip it.
-            bool isConditionMet = await edge.Condition.Callback(processEvent.ToKernelProcessEvent(), this._processStateManager?.GetState()).ConfigureAwait(false);
+            bool isConditionMet = await edge.Condition.Callback(processEvent.ToKernelProcessEvent(), this._processStateManager?.GetState(), this).ConfigureAwait(false);
             if (!isConditionMet)
             {
                 continue;
@@ -548,11 +548,6 @@ internal sealed class LocalProcess : LocalStep, System.IAsyncDisposable
                 }
             }
         }
-
-        if (!foundEdge)
-        {
-            int edgeCount = edges.Count();
-        }
     }
 
     private async Task EnqueueOnEnterMessagesAsync(Queue<ProcessMessage> messageChannel)
@@ -610,10 +605,6 @@ internal sealed class LocalProcess : LocalStep, System.IAsyncDisposable
             }
 
             var events = step.GetEdgeForEvent(stepEvent.QualifiedId);
-            if (events.Count() == 0)
-            {
-                int x = 3;
-            }
             await this.EnqueueEdgesAsync(events, messageChannel, stepEvent).ConfigureAwait(false);
             // Get the edges for the event and queue up the messages to be sent to the next steps.
             //bool foundEdge = false;

@@ -105,6 +105,7 @@ internal static class StepExtensions
     /// <param name="logger">An instance of <see cref="ILogger"/>.</param>
     /// <param name="externalMessageChannel">An instance of <see cref="IExternalKernelProcessMessageChannel"/></param>
     /// <param name="agentDefinition">An instance of <see cref="AgentDefinition"/></param>
+    /// <param name="stateStore">An instance of <see cref="IKernelProcessUserStateStore"/></param>
     /// <returns><see cref="Dictionary{TKey, TValue}"/></returns>
     /// <exception cref="InvalidOperationException"></exception>
     public static Dictionary<string, Dictionary<string, object?>?> FindInputChannels(
