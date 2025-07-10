@@ -10,17 +10,22 @@ namespace Microsoft.SemanticKernel;
 public sealed class KernelProcessStepContext
 {
     private readonly IKernelProcessMessageChannel _stepMessageChannel;
-    private readonly IKernelProcessUserStateStore? _userStateStore;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="KernelProcessStepContext"/> class.
     /// </summary>
     /// <param name="channel">An instance of <see cref="IKernelProcessMessageChannel"/>.</param>
+    /// <param name="userStateStore"></param>
     public KernelProcessStepContext(IKernelProcessMessageChannel channel, IKernelProcessUserStateStore? userStateStore = null)
     {
         this._stepMessageChannel = channel;
-        this._userStateStore = userStateStore;
+        this.UserStateStore = userStateStore;
     }
+
+    /// <summary>
+    /// %%% COMMENT
+    /// </summary>
+    public IKernelProcessUserStateStore? UserStateStore { get; }
 
     /// <summary>
     /// Emit an SK process event from the current step.
@@ -63,11 +68,7 @@ public sealed class KernelProcessStepContext
     /// <returns></returns>
     public Task<T> GetUserStateAsync<T>(string key) where T : class
     {
-        IKernelProcessUserStateStore? x = this._userStateStore;
-        return
-            x == null ?
-                Task.FromResult<T>(null!) :
-                x.GetUserStateAsync<T>(key);
+        return this.UserStateStore?.GetUserStateAsync<T>(key) ?? Task.FromResult<T>(null!);
     }
 
     /// <summary>
@@ -79,10 +80,6 @@ public sealed class KernelProcessStepContext
     /// <returns></returns>
     public Task SetUserStateAsync<T>(string key, T state) where T : class
     {
-        IKernelProcessUserStateStore? x = this._userStateStore;
-        return
-            x == null ?
-                Task.CompletedTask :
-                x.SetUserStateAsync(key, state);
+        return this.UserStateStore?.SetUserStateAsync(key, state) ?? Task.CompletedTask;
     }
 }

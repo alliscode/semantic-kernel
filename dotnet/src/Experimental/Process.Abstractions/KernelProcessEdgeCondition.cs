@@ -9,8 +9,9 @@ namespace Microsoft.SemanticKernel;
 /// </summary>
 /// <param name="processEvent">The event associated with the edge.</param>
 /// <param name="processState">The readonly process state.</param>
+/// <param name="userState">The user state store.</param>
 /// <returns></returns>
-public delegate Task<bool> KernelProcessEdgeConditionCallback(KernelProcessEvent processEvent, object? processState);
+public delegate Task<bool> KernelProcessEdgeConditionCallback(KernelProcessEvent processEvent, object? processState, IKernelProcessUserStateStore userState);
 
 /// <summary>
 /// A class representing a condition that must be met for a <see cref="KernelProcessEdge"/> to be activated.

@@ -51,8 +51,7 @@ public sealed class KernelProcessEdge
         this.SourceStepId = sourceStepId;
         this.OutputTarget = outputTarget;
         this.GroupId = groupId;
-        this.Condition = condition ?? new KernelProcessEdgeCondition(callback: (_, _) => Task.FromResult(true));
-        //this.Metadata = metadata ?? [];
+        this.Condition = condition ?? new KernelProcessEdgeCondition(callback: (_, _, _) => Task.FromResult(true));
         this.Update = update;
     }
 }
