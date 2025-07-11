@@ -50,7 +50,7 @@ public static class StateMachineBuilder
             if (transition.Condition != null)
             {
                 KernelProcessEdgeCondition edgeCondition = new(
-                    (e, s) =>
+                    (e, s, _) =>
                     {
                         var wrapper = new DeclarativeConditionContentWrapper
                         {
