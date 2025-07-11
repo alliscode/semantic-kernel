@@ -19,7 +19,7 @@ public sealed class MessageSourceBuilder
     {
         this.MessageType = messageType;
         this.Source = source;
-        this.Condition = condition ?? new KernelProcessEdgeCondition((_, _) => Task.FromResult(true));
+        this.Condition = condition ?? new KernelProcessEdgeCondition((_, _, _) => Task.FromResult(true));
     }
 
     /// <summary>

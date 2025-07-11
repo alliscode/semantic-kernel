@@ -59,7 +59,7 @@ public class FoundryListenForBuilder
         if (!string.IsNullOrWhiteSpace(condition))
         {
             edgeCondition = new KernelProcessEdgeCondition(
-            (e, s) =>
+            (e, s, _) =>
             {
                 var wrapper = new DeclarativeConditionContentWrapper
                 {
@@ -87,7 +87,7 @@ public class FoundryListenForBuilder
         if (!string.IsNullOrWhiteSpace(condition))
         {
             edgeCondition = new KernelProcessEdgeCondition(
-            (e, s) =>
+            (e, s, _) =>
             {
                 var wrapper = new DeclarativeConditionContentWrapper
                 {

@@ -216,6 +216,7 @@ public sealed partial class ProcessBuilder : ProcessStepBuilder
     /// </summary>
     /// <param name="id"></param>
     /// <param name="stepFunction"></param>
+    /// <param name="aliases">Aliases that have been used by previous versions of the step, used for supporting backward compatibility when reading old version Process States</param>
     /// <returns></returns>
     public ProcessStepBuilder AddStep(string id, StepFunction stepFunction, IReadOnlyList<string>? aliases = null)
     {

@@ -50,7 +50,7 @@ public class FoundryMessageSourceBuilder
         if (!string.IsNullOrWhiteSpace(this.Condition))
         {
             edgeCondition = new KernelProcessEdgeCondition(
-            (e, s) =>
+            (e, s, _) =>
             {
                 var wrapper = new DeclarativeConditionContentWrapper
                 {
