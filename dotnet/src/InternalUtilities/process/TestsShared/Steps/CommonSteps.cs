@@ -158,6 +158,7 @@ public static class CommonSteps
         [KernelFunction]
         public async Task<string> EchoAsync(KernelProcessStepContext context, string message)
         {
+            Console.WriteLine($"[DELAYED_ECHO-{this.StepName}] EchoAsync method called with message: {message}");
             // Simulate a delay
             Thread.Sleep(this._delayInMs);
             Console.WriteLine($"[DELAYED_ECHO-{this.StepName}]: {message}");

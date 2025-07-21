@@ -3,7 +3,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel.Agents;
 
@@ -162,13 +161,33 @@ internal static class StepExtensions
             return edges;
         }
 
+        // If source names are the same, no replacement needed
+        if (string.Equals(originalSourceName, newSourceName, StringComparison.Ordinal))
+        {
+            return edges;
+        }
+
+        // If original source name is null or empty, can't do replacement
+        if (string.IsNullOrWhiteSpace(originalSourceName))
+        {
+            return edges;
+        }
+
         var updatedEdges = new Dictionary<string, IReadOnlyCollection<KernelProcessEdge>>();
 
         foreach (var kvp in edges)
         {
-            // Ensuring only replacing the first occurrence of the original source name in case it is also used in event name or other parts of the event name.
-            var regex = new Regex($"^{originalSourceName}");
-            var newKey = regex.Replace(kvp.Key, newSourceName, 1);
+            // Use simple string replacement instead of regex to avoid stack overflow
+            // Edge keys are typically in format: "StepName.EventName" 
+            string newKey = kvp.Key;
+            if (kvp.Key.StartsWith(originalSourceName + ".", StringComparison.Ordinal))
+            {
+                newKey = newSourceName + kvp.Key.Substring(originalSourceName.Length);
+            }
+            else if (kvp.Key.Equals(originalSourceName, StringComparison.Ordinal))
+            {
+                newKey = newSourceName;
+            }
 
             updatedEdges[newKey] = kvp.Value;
         }
