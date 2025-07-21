@@ -324,7 +324,15 @@ internal sealed class LocalProcess : LocalStep, System.IAsyncDisposable
                         StorageManager = this.StorageManager,
                     };
             }
-            else if (stepInfo is KernelProcessMap mapStep)
+            else if (step is KernelProcessDelegateStepInfo delegateStep)
+            {
+                localStep = new LocalDelegateStep(delegateStep, this._kernel)
+                {
+                    ParentProcessId = this.Id,
+                    EventProxy = this.EventProxy,
+                };
+            }
+            else if (step is KernelProcessMap mapStep)
             {
                 mapStep = mapStep with { Operation = mapStep.Operation with { State = mapStep.Operation.State with { RunId = mapStep.Operation.State.StepId } } };
                 localStep =
