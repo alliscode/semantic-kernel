@@ -216,19 +216,6 @@ public sealed partial class ProcessBuilder : ProcessStepBuilder
     }
 
     /// <summary>
-    /// Add a step
-    /// </summary>
-    /// <param name="id"></param>
-    /// <param name="stepFunction"></param>
-    /// <param name="aliases">Aliases that have been used by previous versions of the step, used for supporting backward compatibility when reading old version Process States</param>
-    /// <returns></returns>
-    public ProcessStepBuilder AddStepFromFunction(string id, StepFunction stepFunction, IReadOnlyList<string>? aliases = null)
-    {
-        ProcessDelegateBuilder stepBuilder = new(id, stepFunction, this);
-        return this.AddStep(stepBuilder, aliases);
-    }
-
-    /// <summary>
     /// Adds a step to the process from a declarative agent.
     /// </summary>
     /// <param name="agentDefinition">The <see cref="AgentDefinition"/></param>

@@ -1,7 +1,6 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 using System;
 using System.Collections.Generic;
-using Microsoft.SemanticKernel.Process;
 
 namespace Microsoft.SemanticKernel;
 
@@ -164,13 +163,6 @@ public record ProcessFunctionTargetBuilder : ProcessTargetBuilder
         if (step is EndStep)
         {
             this.FunctionName = "END";
-            this.ParameterName = null;
-            return;
-        }
-
-        if (step is ProcessDelegateBuilder)
-        {
-            this.FunctionName = KernelDelegateProcessStep.FunctionName;
             this.ParameterName = null;
             return;
         }
